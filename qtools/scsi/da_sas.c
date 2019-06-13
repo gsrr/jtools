@@ -412,6 +412,8 @@ int send_read_defect_data_12_partial(int sg_fd, int data_fd, int index, unsigned
         printf("get_defect_data_length fail: (index, ret) = (%d, %d)\n", index, ret);
         return -1;
     }
+    int llen = DEFECT12_LEN_COMB(buf[4], buf[5], buf[6], buf[7]);
+    printf("get defect list length : (bytes, blocks) = (%d, %d)\n", llen, llen/8);
     return 0;
     
 }
@@ -419,10 +421,10 @@ int send_read_defect_data_12_partial(int sg_fd, int data_fd, int index, unsigned
 int dump_defect_data_list(int sg_fd, int data_fd, int total_adds)
 {
     unsigned char buf[READ_DEFECT_DATA_12_BUFFER] = {0};
-    int buf_adds = READ_DEFECT_DATA_12_BUFFER / 8;
+    int items;
     int index = 0;
     int ret;
-    int dump_bytes = READ_DEFECT_DATA_12_BUFFER;
+    int dump_bytes = READ_DEFECT_DATA_12_BUFFER - 8;
     int total_bytes = 0;
 
     while (index < total_adds)
@@ -432,16 +434,17 @@ int dump_defect_data_list(int sg_fd, int data_fd, int total_adds)
         {
             break;
         }
-        if((index + buf_adds) >= total_adds)
+        items = (dump_bytes) / 8;
+        if((index + items) >= total_adds)
         {
             dump_bytes = (total_adds - index) * 8;
+            items = (dump_bytes) / 8;
         }
-        dump_buf_to_file(data_fd, buf, dump_bytes);
-        index += buf_adds;
+        dump_buf_to_file(data_fd, buf + 8, dump_bytes);
+        index += items;
         total_bytes += dump_bytes;
         printf("(index, total_adds, dump, total) = (%d, %d, %d, %d)\n", index, total_adds, dump_bytes, total_bytes);
     }
-    printf("(index, total_adds, dump, total) = (%d, %d, %d, %d)\n", index, total_adds, dump_bytes, total_bytes);
 }
 
 int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd)

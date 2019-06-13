@@ -1,2 +1,2 @@
 #!/bin/bash
-rsync -a /root/qtools/ /mnt_172.17.22.50/root/qtools/
+rsync -a /root/jtools/qtools/ /mnt_172.17.22.50/root/qtools/
