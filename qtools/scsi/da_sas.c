@@ -259,25 +259,6 @@ int send_inquiry_vpd_command(int sg_fd, unsigned char op, int data_fd)
     return len;
 }
 
-/*
-
-void browse_read_funcs(char *dev, struct datainfo *dinfo)
-{
-
-
-    int sg_fd;
-    if ((sg_fd = open(dev, O_RDONLY)) < 0) {
-        perror("error opening given file name");
-        return;
-    }
-    //send_read_command(sg_fd, cmd1, READ_CAPACITY_10_CMD_LEN, READ_CAPACITY_10_REPLY_LEN); 
-    unsigned char buf[READ_DEFECT_DATA_12_REPLY_LEN];
-    //unsigned char buf[READ_CAPACITY_16_REPLY_LEN];
-    send_read_command(sg_fd, cmd, buf, sizeof(cmd), sizeof(buf)); 
-    close(sg_fd);
-}
-*/
-
 int send_read_capacity_10(int sg_fd, unsigned char op, int data_fd)
 {
     int ret = -1;
@@ -412,8 +393,6 @@ int send_read_defect_data_12_partial(int sg_fd, int data_fd, int index, unsigned
         printf("get_defect_data_length fail: (index, ret) = (%d, %d)\n", index, ret);
         return -1;
     }
-    int llen = DEFECT12_LEN_COMB(buf[4], buf[5], buf[6], buf[7]);
-    printf("get defect list length : (bytes, blocks) = (%d, %d)\n", llen, llen/8);
     return 0;
     
 }
@@ -490,14 +469,6 @@ void da_gen_sas_data_file(int sg_fd, int enc_id, int port_id)
     get_sup_vpds(sg_fd);
      
     browse_all_funcs(sg_fd, dinfo, data_fd);
-    /*
-    browse_page_funcs(sg_fd, &dinfo[offset]);
-    offset += SAS_PAGE_FUNC_NUM;
-    browse_vpd_funcs(dev, &dinfo[offset]);
-    offset += SAS_FUNC_NUM;
-    browse_read_funcs(dev, &dinfo[offset]);
-    dump_datainfo(dinfo, totalnum);
-    */
     close(data_fd);
 }
 
