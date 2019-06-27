@@ -4,6 +4,7 @@
 #include <string.h>
 #include <getopt.h>
 
+#include "func.h"
 
 
 #define EINVAL 1
@@ -13,18 +14,18 @@
 /* HAL Upper Layer Function */
 int da_iotest(char* arg);
 
+struct option *options;
 typedef int (*fobj) (char* arg);
 
-static fobj func_array[] = {
-
-    da_iotest,
-    NULL,
+struct FuncStruct {
+    char param[256];
+    fobj func;
 };
 
-static struct option options[] = {
-	
-    {"iotest", required_argument, NULL, 0},
-    {0, 0, 0, 0},
+static struct FuncStruct func_array[] = {
+
+    {"iotest", da_iotest},
+    {"", NULL},
 };
 
 typedef struct _cmd_param {

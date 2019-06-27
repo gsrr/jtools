@@ -1,0 +1,255 @@
+diff --git a/NasLib/hal/hal_event.h b/NasLib/hal/hal_event.h
+index daaed97f525..2d5aae9caf5 100755
+--- a/NasLib/hal/hal_event.h
++++ b/NasLib/hal/hal_event.h
+@@ -24,6 +24,7 @@ typedef enum
+     HAL_EVENT_BBU,
+     HAL_EVENT_ZFS,
+     HAL_EVENT_MAX_EVT_NUM,
++    HAL_EVENT_CONTROL,
+ } EVT_FUNC_TYPE;
+ 
+ #ifndef USB_DRV_DEFINED
+@@ -152,6 +153,8 @@ typedef enum
+     ZFS_SCRUB_START,
+     ZFS_SCRUB_COMPLETE,
+     ZFS_SCRUB_CANCEL,
++// For EVENT_CONTROL
++    DA_EVENT_ENABLE,
+ } EVT_FUNC_ACTION;
+ 
+ typedef enum {
+@@ -388,6 +391,10 @@ typedef struct
+         {
+             int learning_action;
+         } __attribute__ ((__packed__)) bbu_learning;
++        struct __event_control
++        {
++            int value;
++        } __attribute__ ((__packed__)) event_control;
+     } param;
+ }__attribute__ ((__packed__))
+ EVT_FUNC_ARG;
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index 8086265abe2..65baf4b35de 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
+ CC = ${CROSS_COMPILE}gcc
+ CFLAGS = -Wall -O2
+ 
+-DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c
+-DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_func.c b/NasUtil/da_util/da_func.c
+new file mode 100644
+index 00000000000..fa04a30147a
+--- /dev/null
++++ b/NasUtil/da_util/da_func.c
+@@ -0,0 +1,63 @@
++#include <linux/netlink.h>
++#include <sys/socket.h> 
++
++#include "da_util.h"
++
++void EVT_Send_To_Kernel(int sock_fd, NETLINK_EVT *event)
++{
++    struct nlmsghdr *nlh = NULL;
++    struct iovec iov;
++    struct msghdr msg;
++    NETLINK_EVT *data;
++    int ret;
++
++    memset(&msg, 0, sizeof(struct msghdr));
++    if ((nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(sizeof(NETLINK_EVT)))) == NULL)
++    {
++        printf("da_util error: fail to alloc nlmsghdr\n");
++        return;
++    }
++    memset(nlh, 0, NLMSG_SPACE(sizeof(NETLINK_EVT)));
++
++    iov.iov_base = (void *)nlh;
++    iov.iov_len = NLMSG_SPACE(sizeof(NETLINK_EVT));
++    msg.msg_iov = &iov;
++    msg.msg_iovlen = 1;
++
++    data = (NETLINK_EVT *)NLMSG_DATA(nlh);
++    memcpy(data, event, sizeof(NETLINK_EVT));
++    ret = sendmsg(sock_fd, &msg,0);
++    if (ret < 0)
++        printf("da_util error: fail to send netlink message:%d\n", ret);
++    free(nlh);
++}
++
++int da_enable(struct paras_in paras)
++{
++    int value;
++    int sock_fd;
++    NETLINK_EVT event;
++
++    value = atoi(paras.value);
++    printf("da_enable : value = %d\n", value);
++    event.type = HAL_EVENT_CONTROL;
++    event.arg.action = DA_EVENT_ENABLE;
++    event.arg.param.event_control.value = value;
++
++    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USERSOCK);
++    if(sock_fd == -1)
++    {
++        printf("da_util fail : fail to create netlink socket.");
++    }
++
++    EVT_Send_To_Kernel(sock_fd, &event);
++
++    return 0;
++}
++
++
++
++
++
++
++
+diff --git a/NasUtil/da_util/da_util.c b/NasUtil/da_util/da_util.c
+index e535fcac869..ffb0eb4525f 100644
+--- a/NasUtil/da_util/da_util.c
++++ b/NasUtil/da_util/da_util.c
+@@ -4,7 +4,6 @@
+ unsigned int parse_cmd_parms(cmd_param *param_ary, char *params)
+ {
+     int i;
+-    unsigned int index_bmp = 0;
+     char *opt, *value;
+     char *opteq;
+ 
+@@ -21,27 +20,32 @@ unsigned int parse_cmd_parms(cmd_param *param_ary, char *params)
+                 if (!strcmp(param_ary[i].param_name, opt))
+                 {
+                     param_ary[i].param_value = value;
+-                    UINT_SET_BIT(index_bmp, i);
+                 }
+             }
+         }
+     }
+ 
+-    return index_bmp;
++    return 0;
+ }
+ 
+ int call_function_by_index(int index)
+ {
+-    unsigned int bmap;
+     struct paras_in paras;
+ 
+     if(optarg)
+     {
+-        bmap = parse_cmd_parms(param_ary, optarg);
+-        if (UINT_TEST_BIT(bmap, PARAM_ENC_ID) && UINT_TEST_BIT(bmap, PARAM_PORT_ID))
++        parse_cmd_parms(param_ary, optarg);
++        if(param_ary[0].param_value != NULL)
++        {
++            paras.enc_id = atoi(param_ary[0].param_value);
++        }
++        if(param_ary[1].param_value != NULL)
++        {
++            paras.port_id = atoi(param_ary[1].param_value);
++        }
++        if(param_ary[2].param_value != NULL)
+         {
+-            paras.enc_id = atoi(param_ary[PARAM_ENC_ID].param_value);
+-            paras.port_id = atoi(param_ary[PARAM_PORT_ID].param_value);
++            paras.value = param_ary[2].param_value;
+         }
+     }
+     return func_array[index].func(paras);
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index 3f3ba0a7881..fffac7572b3 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -5,12 +5,9 @@
+ #include <getopt.h>
+ 
+ #include "hal.h"
+-#include "func.h"
++#include "hal_event.h"
+ 
+ #define EINVAL 1
+-#define UINT_SET_BIT(uint, pos)		((uint) |= (0x00000001 << (pos)))
+-#define UINT_TEST_BIT(uint, pos)			((uint) & (0x00000001 << (pos)))
+-
+ 
+ struct option *options;
+ 
+@@ -19,14 +16,36 @@ typedef struct _cmd_param {
+     char *param_value;
+ } cmd_param;
+ 
++struct paras_in {
++    int enc_id;
++    int port_id;
++    char *value;
++};
++
+ static cmd_param param_ary[] =
+ {
+     { "enc_id", NULL},
+     { "port_id", NULL},
++    { "value", NULL},
+     { NULL, NULL}
+ };
+ 
+-enum PARAM_HAL_APP_PARAM_ARY {
+-    PARAM_ENC_ID = 0,
+-    PARAM_PORT_ID,
++typedef int (*fobj) (struct paras_in);
++
++int da_iotest(struct paras_in);
++int da_sas(struct paras_in);
++int da_enable(struct paras_in);
++
++struct FuncStruct {
++    char param[256];
++    fobj func;
+ };
++
++static struct FuncStruct func_array[] = {
++
++    {"iotest", da_iotest},
++    {"sas", da_sas},
++    {"enable", da_enable},
++    {"", NULL},
++};
++
+diff --git a/NasUtil/da_util/func.h b/NasUtil/da_util/func.h
+deleted file mode 100644
+index a75d6c10a3e..00000000000
+--- a/NasUtil/da_util/func.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-
+-struct paras_in {
+-    int enc_id;
+-    int port_id;
+-};
+-
+-typedef int (*fobj) (struct paras_in);
+-
+-int da_iotest(struct paras_in);
+-int da_sas(struct paras_in);
+-
+-struct FuncStruct {
+-    char param[256];
+-    fobj func;
+-};
+-
+-static struct FuncStruct func_array[] = {
+-
+-    {"iotest", da_iotest},
+-    {"sas", da_sas},
+-    {"", NULL},
+-};
+-

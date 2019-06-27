@@ -1,4 +1,3 @@
-
 #include "da_sas.h"
 
 
@@ -19,7 +18,7 @@ void dump_buf_to_file(int fd, char *buf, int blen)
 void dump_log_page_buffer(char *buf)
 {
     int i;
-    int page_base = 4;
+    int page_base   = 4;
     int page_length = PAGE_LEN_COMB(buf[2], buf[3]);
     printf("page header: ");
     for(i = 0 ; i < 4 ; i++)

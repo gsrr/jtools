@@ -1,0 +1,28 @@
+#!/usr/bin/expect
+set timeout -1
+set arg1 [lindex $argv 0]
+spawn [execcmd]
+match_max 100000
+expect {
+	"*?assword:*" {
+		send -- "[password]\r"
+		exp_continue
+	}
+	"*?(yes/no)*" {
+		send -- "yes\r"
+		exp_continue
+	}
+	"*?Connection refused*" {
+		exp_continue
+	}
+	"*?Permission denied*" {
+		exp_continue
+	}
+	"*?auth failed*" {
+		exp_continue
+	}
+	"*?Unknown module*" {
+		exp_continue
+	}
+}
+exit

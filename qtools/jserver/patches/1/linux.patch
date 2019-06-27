@@ -1,0 +1,82 @@
+diff --git a/drivers/qnap/hal_event.c b/drivers/qnap/hal_event.c
+index 71a2b89bc881..e10edba23332 100644
+--- a/drivers/qnap/hal_event.c
++++ b/drivers/qnap/hal_event.c
+@@ -14,6 +14,9 @@ static struct sock *hal_netlink;
+ DEFINE_SPINLOCK(hal_container_lock);
+ static LIST_HEAD(hal_container_head);
+ 
++int da_event_enable = 0;
++EXPORT_SYMBOL(da_event_enable);
++
+ typedef struct __HAL_NETLINK_CB {
+ 	struct list_head node;
+ 	NETLINK_EVT event;
+@@ -136,11 +139,35 @@ void retrieve_hal_container(void)
+ }
+ EXPORT_SYMBOL(retrieve_hal_container);
+ 
++#define DA_EVENT_LENGTH 3
++
++int is_da_event(NETLINK_EVT *hal_event)
++{
++    int arr[DA_EVENT_LENGTH] = {
++        SET_PD_SCSI_CMD_ERROR,
++        SET_PD_ATA_LINK_ERROR,
++        SET_PD_ATA_QC_ERROR,
++    };
++    int i;
++
++    for(i = 0 ; i < DA_EVENT_LENGTH; i++)
++    {
++        if(hal_event->arg.action == arr[i])
++        {
++            return 1;
++        }
++    }
++    return 0;
++}
+ 
+ int send_hal_netlink(NETLINK_EVT *hal_event)
+ {
+ 	HAL_NETLINK_CB *netlink_cb = NULL;
+ 
++    if(da_event_enable == 0 && is_da_event(hal_event))
++    {
++        return 0;   
++    }
+ 	netlink_cb = kmalloc(sizeof(HAL_NETLINK_CB), GFP_ATOMIC);
+ 
+ 	if (netlink_cb == NULL) {
+diff --git a/include/qnap/hal_event.h b/include/qnap/hal_event.h
+index daaed97f5252..2d5aae9caf59 100644
+--- a/include/qnap/hal_event.h
++++ b/include/qnap/hal_event.h
+@@ -24,6 +24,7 @@ typedef enum
+     HAL_EVENT_BBU,
+     HAL_EVENT_ZFS,
+     HAL_EVENT_MAX_EVT_NUM,
++    HAL_EVENT_CONTROL,
+ } EVT_FUNC_TYPE;
+ 
+ #ifndef USB_DRV_DEFINED
+@@ -152,6 +153,8 @@ typedef enum
+     ZFS_SCRUB_START,
+     ZFS_SCRUB_COMPLETE,
+     ZFS_SCRUB_CANCEL,
++// For EVENT_CONTROL
++    DA_EVENT_ENABLE,
+ } EVT_FUNC_ACTION;
+ 
+ typedef enum {
+@@ -388,6 +391,10 @@ typedef struct
+         {
+             int learning_action;
+         } __attribute__ ((__packed__)) bbu_learning;
++        struct __event_control
++        {
++            int value;
++        } __attribute__ ((__packed__)) event_control;
+     } param;
+ }__attribute__ ((__packed__))
+ EVT_FUNC_ARG;

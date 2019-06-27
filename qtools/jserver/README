@@ -1,0 +1,5 @@
+1. version number in /etc/default_config/uLinux.conf
+(/sbin/getcfg System Version -f /etc/default_config/uLinux.conf)
+
+2. python3 jserver.py init
+

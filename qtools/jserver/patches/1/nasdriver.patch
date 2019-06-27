@@ -1,0 +1,38 @@
+diff --git a/drivers/hal/hal_netlink.c b/drivers/hal/hal_netlink.c
+index f4fc2594..d3847e7d 100755
+--- a/drivers/hal/hal_netlink.c
++++ b/drivers/hal/hal_netlink.c
+@@ -46,6 +46,7 @@ static struct proc_dir_entry *ata_time_procdir;
+ static struct proc_dir_entry *ata_retry_procdir;
+ extern int qnap_ata_reset_to_ms; // unit: ms
+ extern int qnap_ata_retry_val;
++extern int da_event_enable;
+ 
+ /* Receive messages from netlink socket. */
+ static void udp_receive(struct sk_buff  *skb)
+@@ -53,6 +54,7 @@ static void udp_receive(struct sk_buff  *skb)
+ 	NETLINK_EVT			*data;
+     struct __netlink_pd_cb *netlink_pd;
+     struct __netlink_enc_cb *netlink_enc;
++    struct __event_control *event_ctl;
+ 	struct nlmsghdr *nlh;
+ 	struct Scsi_Host *shost = NULL;
+     struct scsi_device *sdev = NULL;
+@@ -60,6 +62,17 @@ static void udp_receive(struct sk_buff  *skb)
+ 	data = NLMSG_DATA(nlh);
+     switch(data->type)
+     {
++        case HAL_EVENT_CONTROL:
++            switch(data->arg.action)
++            {
++                case DA_EVENT_ENABLE:
++                    event_ctl = &data->arg.param.event_control;
++                    da_event_enable = event_ctl->value;
++                    printk("(value, da_event_enable):(%d, %d)\n", event_ctl->value, da_event_enable);
++                    break;
++            }
++            break;
++
+         case HAL_EVENT_GENERAL_DISK:
+             netlink_pd = &data->arg.param.netlink_pd;
+             switch(data->arg.action)
