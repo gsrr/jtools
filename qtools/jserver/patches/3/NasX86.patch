@@ -1,0 +1,92 @@
+diff --git a/NasLib/hal/hal.h b/NasLib/hal/hal.h
+index 49870a20be6..acdfced50ef 100755
+--- a/NasLib/hal/hal.h
++++ b/NasLib/hal/hal.h
+@@ -186,7 +186,7 @@ extern "C" {
+ #define NAS_DISK_DATA_IOTEST_SCRIPT 	"/etc/init.d/da_iotest.sh"
+ #define NAS_CONF_DISK_DATA_SECTION      "Disk Data Collection"
+ #define NAS_CONF_DISK_DATA_ENABLED      "Enabled"
+-#define NAS_DISK_DATA_LOCATION	        "/tmp/"
++#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.disk_data"
+ 
+ #define NAS_CONF_FILE                   "/etc/config/uLinux.conf"
+ 
+diff --git a/NasLib/hal/hal_sys_enc.c b/NasLib/hal/hal_sys_enc.c
+index a658b72a834..0c7f359fb96 100755
+--- a/NasLib/hal/hal_sys_enc.c
++++ b/NasLib/hal/hal_sys_enc.c
+@@ -13029,6 +13029,8 @@ int se_sys_set_disk_data_collection(IN int enable)
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=1");
++            system(cmd);
+         }
+         else if (enable == 0)
+         {
+@@ -13038,6 +13040,8 @@ int se_sys_set_disk_data_collection(IN int enable)
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=0");
++            system(cmd);
+         }
+         ret = 0;
+     }
+diff --git a/NasUtil/da_util/da_func.c b/NasUtil/da_util/da_func.c
+index fa04a30147a..0cf19a42bea 100644
+--- a/NasUtil/da_util/da_func.c
++++ b/NasUtil/da_util/da_func.c
+@@ -32,6 +32,18 @@ void EVT_Send_To_Kernel(int sock_fd, NETLINK_EVT *event)
+     free(nlh);
+ }
+ 
++int da_enable_by_cfg(struct paras_in paras)
++{
++    int ret;
++    ret = system("/bin/cat /etc/config/crontab | /bin/grep disk_data_collection");
++    if(ret != 0)
++    {
++        printf("disk_data_collection is not enabled\n");
++        return ret;
++    }
++    return da_enable(paras);
++}
++
+ int da_enable(struct paras_in paras)
+ {
+     int value;
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index fffac7572b3..f3b6f446943 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -35,6 +35,7 @@ typedef int (*fobj) (struct paras_in);
+ int da_iotest(struct paras_in);
+ int da_sas(struct paras_in);
+ int da_enable(struct paras_in);
++int da_enable_by_cfg(struct paras_in);
+ 
+ struct FuncStruct {
+     char param[256];
+@@ -46,6 +47,7 @@ static struct FuncStruct func_array[] = {
+     {"iotest", da_iotest},
+     {"sas", da_sas},
+     {"enable", da_enable},
++    {"enable_by_cfg", da_enable_by_cfg},
+     {"", NULL},
+ };
+ 
+diff --git a/NasUtil/hal_util/hal_util_main.c b/NasUtil/hal_util/hal_util_main.c
+index a4e4c75c748..819178faf46 100755
+--- a/NasUtil/hal_util/hal_util_main.c
++++ b/NasUtil/hal_util/hal_util_main.c
+@@ -3123,6 +3123,9 @@ int main(int argc, char** argv)
+     THREAD_INFO evt_monotor_thread_info;
+     void *exit = NULL;
+     int ret = -1;
++
++    system("/sbin/da_util --enable_by_cfg value=1");
++
+     if((ap_name = strrchr(argv[0], '/')) == NULL)
+         ap_name = argv[0];
+     else

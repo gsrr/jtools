@@ -38,7 +38,6 @@ int is_dir_exist(char *path)
         {
             printf("%s is not a dir\n", path);
             return -1;
-        :q
         }
         printf("%s is exist\n", path);
     }
@@ -81,6 +80,49 @@ int is_mnt_exist(char *mntdir)
 	endmntent(fp);
 	printf("%s is not exist\n", mntdir);
 	return -1;
+}
+
+/*
+ * you can use an asterisk (*) to pass the width specifier/precision to printf(), rather than hard coding it into the format string
+ */
+void split_str(char *line, int len, char del)
+{
+    printf("version 1\n");
+    int i;
+    for(i = 0 ; i < len ; i++)
+    {
+        if (line[i] == del)
+        {
+            break;
+        }
+    }
+    printf("key = value : %.*s = %s\n", i, line, line + i + 1);
+}
+
+int read_line_by_line(char *path)
+{
+    FILE *fp = fopen(path, "r");
+    char *line = NULL;
+    size_t len = 0;
+    char *pch = NULL;
+
+    if(fp == NULL) {
+        perror("Unable to open file!");
+        return -1;
+    }
+
+    while(getline(&line, &len, fp) != -1) {
+        printf("line length: %zd\n", strlen(line));
+        split_str(line, len, '=');        
+    }
+
+    printf("\n\nMax line size: %zu\n", len);
+
+    fclose(fp);
+    free(line); 
+    // getline will resize the input buffer as necessary
+    // the user needs to free the memory when not needed!
+    return 0;
 }
 
 int main(int argc, char *argv[])

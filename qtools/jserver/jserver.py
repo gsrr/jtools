@@ -161,7 +161,7 @@ def dump_dic_to_file(dst, cfg):
                 fw.write("%s\n"%cfg['title'])
             else:
                 fw.write("%s\n"%key)
-                fw.write("\t%s\n"%cfg[key])
+                fw.write(" " * 4 + "%s\n"%cfg[key])
 
 @decor_gen_commit_msg
 def gen_commit_msg(name, files):
@@ -169,6 +169,27 @@ def gen_commit_msg(name, files):
     msg_cfg = read_file("%s/README"%ppath)
     msg_cfg['related files'] = files
     dump_dic_to_file("%s/%s.msg"%(ppath, name), msg_cfg)
+
+def gen_patch():
+    base_num = int(sys.argv[2])
+    ps = [ int(x) for x in os.listdir("./patches") ]
+    max_ps = max(ps) + 1
+
+    base_dir = "./patches/%d"%(base_num)
+    dst_dir = "./patches/%d"%(max_ps)
+    os.mkdir(dst_dir)
+    os.system("cp %s/manifest %s"%(base_dir, dst_dir))
+    os.system("cp %s/README %s"%(base_dir, dst_dir))
+
+def help():
+    cmds = [
+        'python3 jserver.py init',
+        'python3 jserver.py gen_patch $base_num',
+        'python3 jserver.py gen_commit_msg $patch_num',
+        'python3 jserver.py gen_commit_patch $patch_num',
+    ]
+    for cmd in cmds:
+        print(cmd)
 
 def main():
     func = getattr(sys.modules[__name__], sys.argv[1])
