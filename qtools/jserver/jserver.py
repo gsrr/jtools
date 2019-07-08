@@ -7,6 +7,8 @@ import glob
 import xml.etree.cElementTree as ET
 import subprocess
 
+gconfig = configparser.ConfigParser()
+gconfig.read('jserver.conf')
 
 def check_port(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -73,8 +75,8 @@ def rm_redund_mnt():
         os.rmdir(m)
 
 def init():
-    config = configparser.ConfigParser()
-    config.read('jserver.conf')
+    global gconfig
+    config = gconfig
     for section in config.sections():
         hosts = config[section]['host'].split(",")
         for host in hosts:
@@ -181,12 +183,27 @@ def gen_patch():
     os.system("cp %s/manifest %s"%(base_dir, dst_dir))
     os.system("cp %s/README %s"%(base_dir, dst_dir))
 
+# patch -p1 -i ../CVE-2015-1038.patch
+def exec_patch():
+    cmd = "patch -p1 -i %s -d %s"
+    global gconfig
+    lconfig = gconfig['build_server']
+    root = read_manifest()
+    for proj in root:
+        print (proj.attrib['path'], proj.attrib['name'])
+        patch_path = os.path.abspath('patches/%s/%s.patch'%(sys.argv[2], proj.attrib['name']))
+        target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])
+        cmd = cmd%(patch_path, target_path)
+        print (cmd)
+        os.system(cmd)
+
 def help():
     cmds = [
         'python3 jserver.py init',
         'python3 jserver.py gen_patch $base_num',
         'python3 jserver.py gen_commit_msg $patch_num',
         'python3 jserver.py gen_commit_patch $patch_num',
+        'python3 jserver.py exec_patch $patch_num',
     ]
     for cmd in cmds:
         print(cmd)

@@ -1,0 +1,2 @@
+1. change disk data location from ".disk_data" to ".sata_disk_data".
+2. da_util --sata_reset_cnt for deleting all files.

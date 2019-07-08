@@ -1,0 +1,103 @@
+diff --git a/NasLib/hal/hal.h b/NasLib/hal/hal.h
+index acdfced50ef..a6bd935f0c2 100755
+--- a/NasLib/hal/hal.h
++++ b/NasLib/hal/hal.h
+@@ -186,7 +186,7 @@ extern "C" {
+ #define NAS_DISK_DATA_IOTEST_SCRIPT 	"/etc/init.d/da_iotest.sh"
+ #define NAS_CONF_DISK_DATA_SECTION      "Disk Data Collection"
+ #define NAS_CONF_DISK_DATA_ENABLED      "Enabled"
+-#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.disk_data"
++#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.sata_disk_data"
+ 
+ #define NAS_CONF_FILE                   "/etc/config/uLinux.conf"
+ 
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index 65baf4b35de..24d95f63a48 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
+ CC = ${CROSS_COMPILE}gcc
+ CFLAGS = -Wall -O2
+ 
+-DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c
+-DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_sata.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_sata.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index f3b6f446943..c36c8555c08 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -3,6 +3,8 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <getopt.h>
++#include <dirent.h>
++#include <unistd.h>
+ 
+ #include "hal.h"
+ #include "hal_event.h"
+@@ -36,6 +38,7 @@ int da_iotest(struct paras_in);
+ int da_sas(struct paras_in);
+ int da_enable(struct paras_in);
+ int da_enable_by_cfg(struct paras_in);
++int da_sata_reset_cnt(struct paras_in);
+ 
+ struct FuncStruct {
+     char param[256];
+@@ -48,6 +51,7 @@ static struct FuncStruct func_array[] = {
+     {"sas", da_sas},
+     {"enable", da_enable},
+     {"enable_by_cfg", da_enable_by_cfg},
++    {"stat_reset_cnt", da_sata_reset_cnt},
+     {"", NULL},
+ };
+ 
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index ab9e591c45d..389383f016a 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -3009,7 +3009,12 @@ static void atacmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct
+     int ret;
+     PD_INFO pd_info;
+ 
+-    PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "atacmd error : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
+     UTIL_Debug(TRACE_WARNING, "atacmd error : (%s, %d, %d)\n", pd_info.serial_no, netlink_ata_qc->state, netlink_ata_qc->err);    
+     ataqc_err_dispatch(pd_info.serial_no, netlink_ata_qc->state, netlink_ata_qc->err);
+ }
+@@ -3018,7 +3023,12 @@ static void atalink_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct
+     int ret;
+     PD_INFO pd_info;
+ 
+-    PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "atalink link error : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
+     UTIL_Debug(TRACE_WARNING, "atalink link error : (%s, %d)\n", pd_info.serial_no, netlink_ata_link->serror);    
+     atalink_err_dispatch(pd_info.serial_no, netlink_ata_link->serror);
+ }
+@@ -3028,7 +3038,12 @@ static void scsicmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct
+     int ret;
+     PD_INFO pd_info;
+ 
+-    PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "scsicmd retry/error/latency : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
+     if(pd_info.type != PD_SATA)
+     {
+         return;
