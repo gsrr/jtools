@@ -1,2 +1,10 @@
-1. change disk data location from ".disk_data" to ".sata_disk_data".
-2. da_util --sata_reset_cnt for deleting all files.
+1. change disk data location from ".disk_data" to ".system_disk_data".
+2. da_util --system_reset_cnt for deleting all files.
+3. hal_daemon deadlock test.
+
+
+
+
+[information]
+* scsicmd retry/error/latency : can not get pdinfo : (enc=0, port=5)
+

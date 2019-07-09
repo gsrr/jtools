@@ -1,5 +1,5 @@
 diff --git a/NasLib/hal/hal.h b/NasLib/hal/hal.h
-index acdfced50ef..a6bd935f0c2 100755
+index acdfced50ef..0da27a2cc63 100755
 --- a/NasLib/hal/hal.h
 +++ b/NasLib/hal/hal.h
 @@ -186,7 +186,7 @@ extern "C" {
@@ -7,12 +7,12 @@ index acdfced50ef..a6bd935f0c2 100755
  #define NAS_CONF_DISK_DATA_SECTION      "Disk Data Collection"
  #define NAS_CONF_DISK_DATA_ENABLED      "Enabled"
 -#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.disk_data"
-+#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.sata_disk_data"
++#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.system_disk_data"
  
  #define NAS_CONF_FILE                   "/etc/config/uLinux.conf"
  
 diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
-index 65baf4b35de..24d95f63a48 100644
+index 65baf4b35de..45e6170a28d 100644
 --- a/NasUtil/da_util/Makefile
 +++ b/NasUtil/da_util/Makefile
 @@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
@@ -21,13 +21,56 @@ index 65baf4b35de..24d95f63a48 100644
  
 -DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c
 -DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o
-+DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_sata.c
-+DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_sata.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o
  
  all: $(DA_UTIL_OBJS)
  	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_system.c b/NasUtil/da_util/da_system.c
+new file mode 100644
+index 00000000000..f757cea28e5
+--- /dev/null
++++ b/NasUtil/da_util/da_system.c
+@@ -0,0 +1,37 @@
++#include "da_util.h"
++
++
++int da_system_reset_cnt(struct paras_in paras)
++{
++    char *path = NAS_DISK_DATA_LOCATION;
++    struct dirent *de;
++    DIR *dr = opendir(path);
++    char buf[512] = {0};
++
++    if (dr == NULL)
++    {
++        printf("Could not open current directory" );
++        return 0;
++    }
++
++    while ((de = readdir(dr)) != NULL)
++    {
++        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
++        {
++            continue;
++        }
++        sprintf(buf, "%s/%s", path, de->d_name);
++        printf("remove file: %s\n", buf);
++        unlink(buf);
++    }
++
++    closedir(dr);
++    return 0;
++}
++
++
++
++
++
++
++
 diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
-index f3b6f446943..c36c8555c08 100644
+index f3b6f446943..985be1e649a 100644
 --- a/NasUtil/da_util/da_util.h
 +++ b/NasUtil/da_util/da_util.h
 @@ -3,6 +3,8 @@
@@ -43,7 +86,7 @@ index f3b6f446943..c36c8555c08 100644
  int da_sas(struct paras_in);
  int da_enable(struct paras_in);
  int da_enable_by_cfg(struct paras_in);
-+int da_sata_reset_cnt(struct paras_in);
++int da_system_reset_cnt(struct paras_in);
  
  struct FuncStruct {
      char param[256];
@@ -51,7 +94,7 @@ index f3b6f446943..c36c8555c08 100644
      {"sas", da_sas},
      {"enable", da_enable},
      {"enable_by_cfg", da_enable_by_cfg},
-+    {"stat_reset_cnt", da_sata_reset_cnt},
++    {"system_reset_cnt", da_system_reset_cnt},
      {"", NULL},
  };
  
