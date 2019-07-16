@@ -1,0 +1,22 @@
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+index b30e240834a..6c7dc7ed5fc 100644
+--- a/NasUtil/da_util/da_sas.c
++++ b/NasUtil/da_util/da_sas.c
+@@ -838,6 +838,17 @@ void da_gen_sas_header(struct datainfo *dinfo, int enc_id, int port_id, char *di
+ 
+     fprintf(pOutput_File, "Interface: SAS\n");
+     fprintf(pOutput_File, "Attribute: Regular\n");
++    
++    int record_count = 0;
++    for(i = 0 ; i < SAS_FUNC_NUM + NAS_FUNC_NUM ; i++)
++    {
++        if(dinfo[i].len <= 0)
++        {
++            continue;
++        }
++        record_count += 1;
++    }
++    fprintf(pOutput_File, "No. of Records: %d\n", record_count);
+ 
+     cnt = 1;
+     disk_data_offset = DISK_SAS_DATA_PACKAGE_HEADER_SIZE;

@@ -1,0 +1,3 @@
+title=spec #20937 - ULINK template 16, 201(item 22),202(item 23)
+model=TS-ALL
+description=modify latency count mechanism (SSD 300ms, HDD 1000ms) and add scsi timeout event

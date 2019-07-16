@@ -1,0 +1,19 @@
+#!/bin/bash
+
+case1: latency count value test (ssd:300ms, hdd:1000ms)
+cat /sys/block/sdb/device/qnap_param_latency
+
+case2: latency count mechanism test
+ioping /dev/sdb
+echo 1 > cat /sys/block/sdb/device/qnap_param_latency
+cat /dev/kmsg
+cat /share/CACHEDEV1_DATA/.disk_data/
+
+case3: scsi_times_out test
+how ???
+ioping & unplug drive?
+
+
+
+
+

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+
+<manifest src="172.17.22.47/sdbpool/gitqnap" dst="172.17.22.104">
+  <project path="NasX86/Kernel/linux-4.14" name="linux" revision="QNAP-4.14-develop_latency_count"/>
+  <project path="NasX86" name="NasX86" revision="master-latency_count"/>
+</manifest>

@@ -1,0 +1,87 @@
+diff --git a/drivers/scsi/scsi_error.c b/drivers/scsi/scsi_error.c
+index 6ea9320e311f..71faff270a8e 100644
+--- a/drivers/scsi/scsi_error.c
++++ b/drivers/scsi/scsi_error.c
+@@ -287,7 +287,8 @@ enum blk_eh_timer_return scsi_times_out(struct request *req)
+ 	scsi_log_completion(scmd, TIMEOUT_ERROR);
+ 
+ #if defined(CONFIG_MACH_QNAPTS)
+-    scsi_cmd_issue_halevent(scmd, SCSI_CMD_HAL_LONG_LATENCY);
++    printk("issue scsi timeout event\n");
++    scsi_cmd_issue_halevent(scmd, SCSI_CMD_HAL_TIMES_OUT);
+ #endif
+ 	if (host->eh_deadline != -1 && !host->last_reset)
+ 		host->last_reset = jiffies;
+diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
+index 5d11f53b12d2..08d9d1ea934a 100644
+--- a/drivers/scsi/scsi_lib.c
++++ b/drivers/scsi/scsi_lib.c
+@@ -1760,10 +1760,6 @@ static void scsi_softirq_done(struct request *rq)
+ 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
+ 	unsigned long wait_for = (cmd->allowed + 1) * rq->timeout;
+ 	int disposition;
+-#if defined(CONFIG_MACH_QNAPTS)
+-	unsigned long long now = sched_clock();
+-    unsigned long long  max_latency = cmd->device->param_latency * 1000000;
+-#endif
+ 
+ 	INIT_LIST_HEAD(&cmd->eh_entry);
+ 	
+@@ -1771,8 +1767,9 @@ static void scsi_softirq_done(struct request *rq)
+     
+ 	if(cmd->device->param_latency > 0)
+ 	{
+-        if ((now - rq->io_start_time_ns) >=  max_latency)
++        if (jiffies_to_msecs(cmd->jiffies_latency) > cmd->device->param_latency)
+         {
++            printk("%d, %9ph\n", cmd->jiffies_latency, cmd->cmnd);
+             scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_LONG_LATENCY);
+         }
+ 	}
+@@ -1840,6 +1837,9 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+ 	struct scsi_device *sdev = cmd->device;
+ #endif
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++    cmd->jiffies_latency = jiffies;
++#endif
+ 	atomic_inc(&cmd->device->iorequest_cnt);
+ 
+ 	/* check if the device is still usable */
+@@ -1990,8 +1990,12 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+  */
+ static void scsi_done(struct scsi_cmnd *cmd)
+ {
++#if defined(CONFIG_MACH_QNAPTS)
++    cmd->jiffies_latency = jiffies - cmd->jiffies_latency;
++#endif
+ 	trace_scsi_dispatch_cmd_done(cmd);
+ 	blk_complete_request(cmd->request);
++
+ }
+ 
+ /*
+diff --git a/include/qnap/hal_event.h b/include/qnap/hal_event.h
+index 2d5aae9caf59..d899793e502a 100644
+--- a/include/qnap/hal_event.h
++++ b/include/qnap/hal_event.h
+@@ -161,6 +161,7 @@ typedef enum {
+     SCSI_CMD_HAL_RETRY,
+     SCSI_CMD_HAL_FAIL,
+     SCSI_CMD_HAL_LONG_LATENCY,
++    SCSI_CMD_HAL_TIMES_OUT,
+ } SCSI_CMD_HALTYPE;
+ 
+ typedef struct
+diff --git a/include/scsi/scsi_cmnd.h b/include/scsi/scsi_cmnd.h
+index 7bc752fc98de..6627c1627c8d 100644
+--- a/include/scsi/scsi_cmnd.h
++++ b/include/scsi/scsi_cmnd.h
+@@ -90,6 +90,7 @@ struct scsi_cmnd {
+ 	 * been outstanding
+ 	 */
+ 	unsigned long jiffies_at_alloc;
++	unsigned long jiffies_latency;
+ 
+ 	int retries;
+ 	int allowed;

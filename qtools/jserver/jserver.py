@@ -185,11 +185,11 @@ def gen_patch():
 
 # patch -p1 -i ../CVE-2015-1038.patch
 def exec_patch():
-    cmd = "patch -p1 -i %s -d %s"
     global gconfig
     lconfig = gconfig['build_server']
     root = read_manifest()
     for proj in root:
+        cmd = "patch -p1 -i %s -d %s"
         print (proj.attrib['path'], proj.attrib['name'])
         patch_path = os.path.abspath('patches/%s/%s.patch'%(sys.argv[2], proj.attrib['name']))
         target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])

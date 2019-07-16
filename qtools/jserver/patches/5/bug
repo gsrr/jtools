@@ -1,0 +1,8 @@
+3. 
+
+2.  The result still have template 203 when sata disk show "fail to get Raid info".
+--> Done, add error handle for raid info.
+
+1. The result still have template 203 when nvme disk show "fail to get Raid info".
+--> Done, add error handle for raid info.
+

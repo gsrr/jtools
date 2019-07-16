@@ -1,0 +1,27 @@
+#!/bin/bash
+
+#case:1 (raid info template test)
+/root/da_util --system_raid_info enc_id=0,port_id=11
+hexdump -C /tmp/raid_info_0_11
+
+#case:2 (sas add raid info template)
+/root/da_util --sas enc_id=0,port_id=11
+less /tmp/smart/disk_data_pkg_0-11.bin
+hexdump -C /tmp/smart/disk_data_pkg_0-11.bin
+
+#case:3 (nvme add raid info template without raidinfo)
+hal_app --pd_sys_get_data_package enc_id=23,port_id=1
+less /tmp/smart/disk_data_pkg_23-1.bin
+
+#case:3-1 (nvme add raid info template with raidinfo)
+hal_app --pd_sys_get_data_package enc_id=23,port_id=1
+less /tmp/smart/disk_data_pkg_23-1.bin
+
+#case:4 (sata add raid info template)
+hal_app --pd_sys_get_data_package enc_id=0,port_id=5
+less /tmp/smart/disk_data_pkg_0-5.bin
+
+#case:5 (Don't include template 16,201,202 if default volume is not initialized)
+hal_app --pd_sys_get_data_package enc_id=0,port_id=5
+less /tmp/smart/disk_data_pkg_0-5.bin
+

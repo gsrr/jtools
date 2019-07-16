@@ -1,0 +1,108 @@
+diff --git a/NasLib/hal/hal_da_util.h b/NasLib/hal/hal_da_util.h
+index 4c2dbfdaa40..bea39c9c26e 100644
+--- a/NasLib/hal/hal_da_util.h
++++ b/NasLib/hal/hal_da_util.h
+@@ -1,4 +1,9 @@
+ 
++#define TEMPLATE16_CNT  15
++#define TEMPLATE201_CNT  10
++#define TEMPLATE202_CNT  5
++
++
+ 
+ struct da_temp_info {
+     int len;
+diff --git a/NasLib/hal/hal_event.h b/NasLib/hal/hal_event.h
+index 2d5aae9caf5..d899793e502 100755
+--- a/NasLib/hal/hal_event.h
++++ b/NasLib/hal/hal_event.h
+@@ -161,6 +161,7 @@ typedef enum {
+     SCSI_CMD_HAL_RETRY,
+     SCSI_CMD_HAL_FAIL,
+     SCSI_CMD_HAL_LONG_LATENCY,
++    SCSI_CMD_HAL_TIMES_OUT,
+ } SCSI_CMD_HALTYPE;
+ 
+ typedef struct
+diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
+index c8b5cf1c46d..de243e1d15f 100755
+--- a/NasLib/hal/hal_pd.c
++++ b/NasLib/hal/hal_pd.c
+@@ -10507,12 +10507,12 @@ int PD_Set_ATA_IO_Latency(IN PD_INFO *pd_info)
+ 
+     if(pd_info->capabilities & PD_CAP_SSD)
+     {
+-        sprintf(cmd, "echo 10 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
++        sprintf(cmd, "echo 300 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
+         system(cmd);
+     }
+     else
+     {
+-        sprintf(cmd, "echo 100 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
++        sprintf(cmd, "echo 1000 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
+         system(cmd);
+     }
+     return 0;
+diff --git a/NasLib/hal/hal_sys_common.c b/NasLib/hal/hal_sys_common.c
+index a84488d59c0..633a8987a15 100755
+--- a/NasLib/hal/hal_sys_common.c
++++ b/NasLib/hal/hal_sys_common.c
+@@ -30,6 +30,7 @@
+ #include "hal_sys_common.h"
+ #include "err_trace.h"
+ #include "hal_utils.h"
++#include "hal_da_util.h"
+ 
+ static char *qm2_class_str[] =
+ {
+@@ -4924,19 +4925,19 @@ ULINK_TEMPLATE* common_ulink_init_template(int tnum)
+         case 16:
+             tmp->num = 16;
+             tmp->rev = 100;
+-            tmp->cnt = 15;
++            tmp->cnt = TEMPLATE16_CNT;
+             tmp->len = ULINK_TEMPLATE_SIZE;
+             break;
+         case 201:
+             tmp->num = 201;
+             tmp->rev = 100;
+-            tmp->cnt = 9;
++            tmp->cnt = TEMPLATE201_CNT;
+             tmp->len = ULINK_TEMPLATE_SIZE;
+             break;
+         case 202:
+             tmp->num = 202;
+             tmp->rev = 100;
+-            tmp->cnt = 5;
++            tmp->cnt = TEMPLATE202_CNT;
+             tmp->len = ULINK_TEMPLATE_SIZE;
+             break;
+         default:
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index 389383f016a..08e7ee79ca0 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -2890,6 +2890,12 @@ static void scsicmd_err_dispatch_latency(char *sn, int cmdtype)
+             break;
+     }
+ }
++
++static void scsicmd_err_dispatch_timesout(char *sn, int cmdtype)
++{
++    UTIL_Debug(TRACE_WARNING, "dispatch timesout: %d\n", cmdtype);    
++    PD_Inc_ATA_ErrCnt(sn, 201, 10);
++}
+ static int atacmd_type_dispatch(unsigned char tfcmd)
+ {
+     int cmdtype = -1;
+@@ -3003,6 +3009,10 @@ static void scsicmd_err_dispatch(char *sn, int action, unsigned char *scmd)
+     {
+         scsicmd_err_dispatch_latency(sn, cmdtype);
+     }
++    else if(action == 3)
++    {
++        scsicmd_err_dispatch_timesout(sn, cmdtype);
++    }
+ }
+ static void atacmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct __netlink_pd_ata_qc_err *netlink_ata_qc)
+ {
