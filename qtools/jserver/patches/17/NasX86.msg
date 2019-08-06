@@ -1,0 +1,8 @@
+jira QTSSTS00-3 SSD Life estimation into S.M.A.R.T. disk migration
+
+model
+    TS-ALL
+description
+    Add SSD Life estimation into S.M.A.R.T disk migration
+related files
+    NasUtil/sdmd/sdmd.c

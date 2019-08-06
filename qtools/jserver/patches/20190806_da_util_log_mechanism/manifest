@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+
+<manifest src="/datapool/git_qnap/" dst="172.17.22.179">
+  <project path="NasX86" name="NasX86" revision="master-20190806_da_util_log_mechanism"/>
+</manifest>

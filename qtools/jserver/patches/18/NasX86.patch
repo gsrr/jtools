@@ -1,0 +1,25 @@
+diff --git a/NasUtil/da_util/da_iotest.c b/NasUtil/da_util/da_iotest.c
+index ffbd9e0722e..2d35a9765fe 100644
+--- a/NasUtil/da_util/da_iotest.c
++++ b/NasUtil/da_util/da_iotest.c
+@@ -42,16 +42,16 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+     int fd;
+     unsigned int val = 0;
+ 
+-    struct ulink_iotest_param params[4] = {
++    struct ulink_iotest_param params[2] = {
+         { "randread", 4, 7, 201, 4, 1 },  //IOPS
+-        { "randwrite", 4, 48, 201, 5, 1 }, 
++        //{ "randwrite", 4, 48, 201, 5, 1 }, 
+         { "read", 128, 6, 201, 8, 1000 },  //MBPS
+-        { "write", 128, 47, 201, 9, 1000 }, 
++        //{ "write", 128, 47, 201, 9, 1000 }, 
+     };
+         
+     char cmd[1024] = {0};
+     int i;
+-    for(i = 0 ; i < 4 ; i++)
++    for(i = 0 ; i < 2 ; i++)
+     {
+         sprintf(cmd, "python /usr/local/bin/da_util.pyc fiotest \"fio --name=%s --iodepth=32 --rw=%s --bs=%dK --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=%llu --size=%llu\"", 
+             devname, params[i].ioname, params[i].bw, begin, length);

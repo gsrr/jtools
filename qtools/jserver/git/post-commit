@@ -1,0 +1,35 @@
+#!/usr/bin/python
+
+import os
+import subprocess
+import git
+
+jserver_py = '/datapool/qtools/jserver/jserver.py'
+
+BASE = "/datapool/qtools/jserver/"
+
+def jpopen(cmd):
+    proc = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE)
+    lines = proc.stdout.readlines()
+    print lines
+
+def main():
+    repo = git.Repo.init(path='.')
+    branch_name = str(repo.head.ref)
+    if branch_name == "master":
+        return
+
+    if branch_name.startswith("local") == False:
+        return
+    data = jpopen("git log -1 HEAD --format=%B")
+    patch_name = branch_name.split("-", 1)[1]
+    cmd = "python3 %s re_exec_patch %s"%(jserver_py, patch_name)
+    print cmd
+    os.system(cmd)
+
+    cmd = "python3 %s gen_commit_msg %s"%(jserver_py, patch_name)
+    print cmd
+    os.system(cmd)
+
+if __name__ == "__main__":
+    main()

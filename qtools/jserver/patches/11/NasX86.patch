@@ -1,0 +1,391 @@
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index 9380a61cd40..3234bab876b 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
+ CC = ${CROSS_COMPILE}gcc
+ CFLAGS = -Wall -O2
+ 
+-DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c
+-DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c da_backup.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o da_backup.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_backup.c b/NasUtil/da_util/da_backup.c
+new file mode 100644
+index 00000000000..c93219f5aca
+--- /dev/null
++++ b/NasUtil/da_util/da_backup.c
+@@ -0,0 +1,216 @@
++
++#include "da_util.h"
++#include <time.h>
++
++
++void date_now(char *date)
++{
++    time_t seconds;
++    struct tm *tinfo;
++
++    seconds = time (NULL);
++    tinfo = localtime ( &seconds );
++    sprintf(date, "%d-%d-%d-%d-%d", tinfo->tm_year + 1900, tinfo->tm_mon + 1, tinfo->tm_mday, tinfo->tm_hour, tinfo->tm_min);
++}
++
++int days_now()
++{
++    time_t seconds;
++    int days;
++
++    seconds = time (NULL);
++    return seconds/(60*60*24);
++}
++
++int da_backup_file(struct paras_in paras)
++{
++    char date[128] = {0};
++    PD_INFO pd_info;
++    char newpath[256] = {0}; 
++    char cmd[512] = {0};
++
++    if (PD_Get_Info(paras.enc_id, paras.port_id, &pd_info) < 0)
++    {
++        return -1;
++    }
++    
++    date_now(date);
++
++    sprintf(newpath, "%s/backup", NAS_DISK_DATA_LOCATION);
++    if( access( newpath, F_OK ) == -1 )
++    {
++        mkdir(newpath, 0755);
++    }
++
++    sprintf(newpath, "%s/disk_data_pkg_%d-%d.bin.%s.%s", newpath, paras.enc_id, paras.port_id, pd_info.serial_no, date);
++    
++    sprintf(cmd, "mv %s %s", paras.value, newpath);
++    
++    return system(cmd);
++}
++
++void upload_file(char *buf)
++{
++    char cmd[256] = {0};
++
++    sprintf(cmd, "python /usr/local/bin/da_util.pyc upload_backup_disk_data %s", buf);
++    printf("%s\n", cmd);
++    system(cmd);
++}
++
++int get_pdinfo_from_name(char *name, PD_INFO *pd_info)
++{
++    int i;
++    int enc_id;
++    int port_id;
++    char str[256] = {0};
++    char *tok;
++
++    strcpy(str, name);
++    tok = strtok(str, "-");
++    
++    if(tok == NULL)
++    {
++        printf("file name format error : %s\n", name);
++        return -1;
++    }
++
++    for(i = strlen(tok) - 1; i >= 0 ; i--)
++    {
++        if(tok[i] == '_')
++        {
++            break;
++        }
++    }
++    enc_id = atoi(&tok[i + 1]);
++
++    tok = strtok(0, ".");
++    if(tok == NULL)
++    {
++        printf("file name format error : %s\n", name);
++        return -1;
++    }
++
++    port_id = atoi(tok);
++     
++    if (PD_Get_Info(enc_id, port_id, pd_info) < 0)
++    {
++        return -1;
++    }
++
++    return 0;
++}
++
++int check_serial_number(char *name)
++{
++    // ex: name = disk_data_pkg_0-3.bin.WD-WMAYP7858047.18103
++    int ret;
++    PD_INFO pd_info;
++    char str[256] = {0};
++    char *tok;
++
++    ret = get_pdinfo_from_name(name, &pd_info);
++    if(ret != 0)
++    {
++        return ret;
++    }
++
++    strcpy(str, name);
++    tok = strtok(str, ".");
++    tok = strtok(0, ".");
++    tok = strtok(0, ".");
++    
++    if(tok == NULL)
++    {
++        printf("file name format error : %s\n", name);
++        return -1;
++    }
++    return strcmp(tok, pd_info.serial_no);
++}
++
++int tm2days(char *tm_str)
++{
++    struct tm tm;
++    time_t epoch;
++
++    if ( strptime(tm_str, "%Y-%m-%d-%H-%M", &tm) != NULL )
++    {
++        epoch = mktime(&tm);
++    }
++    else
++    {
++        printf("Can not parse time string\n");
++        return 0;
++    }
++
++    return epoch/(60*60*24);
++}
++
++int check_seven_days(char *name)
++{
++    char str[256] = {0};
++    int days;
++    int pdays;
++    char *tok;
++
++    days = days_now();
++
++    strcpy(str, name);
++    tok = strtok(str, ".");
++    tok = strtok(0, ".");
++    tok = strtok(0, ".");
++    tok = strtok(0, ".");
++    
++    pdays = tm2days(tok);
++    if(days < pdays)
++    {
++        printf("date error : (days, pdays) = (%d, %d)\n", days, pdays);
++        return -1;
++    }
++
++    if(days - pdays > 7)
++    {
++        printf("date error : (days, pdays) = (%d, %d)\n", days, pdays);
++        return -1;
++    }
++    return 0;
++}
++
++int da_upload_backup_file(struct paras_in paras)
++{
++    DIR *dr;
++    struct dirent *de;
++    char path[256] = {0};
++    char buf[256] = {0};
++
++    sprintf(path, "%s/backup", NAS_DISK_DATA_LOCATION);
++    dr = opendir(path);
++    if (dr == NULL)
++    {
++        printf("Could not open current directory" );
++        return 0;
++    }
++
++    while ((de = readdir(dr)) != NULL)
++    {
++        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
++        {
++            continue;
++        }
++        sprintf(buf, "%s/%s", path, de->d_name);
++        if(check_serial_number(de->d_name) != 0)
++        {
++            unlink(buf);
++            continue;
++        }
++        if(check_seven_days(de->d_name) != 0)
++        {
++            unlink(buf);
++            continue;
++        }
++        upload_file(buf);
++    }
++
++    closedir(dr);
++    return 0;
++}
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index ada5d81fb31..2b537b4db2a 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -45,6 +45,8 @@ int da_enable_by_cfg(struct paras_in);
+ int da_system_reset_cnt(struct paras_in);
+ int da_system_raid_info(struct paras_in);
+ int da_gen_header(struct paras_in);
++int da_backup_file(struct paras_in);
++int da_upload_backup_file(struct paras_in);
+ 
+ /*== end:function_declare_area ==*/
+ 
+@@ -63,6 +65,8 @@ static struct FuncStruct func_array[] = {
+     {"system_reset_cnt", da_system_reset_cnt},
+     {"system_raid_info", da_system_raid_info},
+     {"gen_header", da_gen_header},
++    {"backup_file", da_backup_file},
++    {"upload_backup_file", da_upload_backup_file},
+     {"", NULL},
+ };
+ 
+diff --git a/NasUtil/da_util/da_util.py b/NasUtil/da_util/da_util.py
+index 05c2d9df307..63c541f8eae 100644
+--- a/NasUtil/da_util/da_util.py
++++ b/NasUtil/da_util/da_util.py
+@@ -1,5 +1,7 @@
+ import sys
+ import subprocess
++import os
++import re
+ 
+ def da_popen(cmd):
+     proc = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE)
+@@ -14,6 +16,62 @@ def get_network_ip():
+     except:
+         print ""
+ 
++def get_upload_url(enc_id, port_id):
++    cmd = '/usr/local/bin/qcloud_blob_tool request_url_only -c 5c4fc381ab6dd106bb803b3b -d "{\\"enc_id\\":%d,\\"port_id\\":%d}"'%(enc_id, port_id)
++    data = da_popen(cmd)
++    if len(data) == 0:
++        return ""
++
++    lines = data.split("\n")
++    for line in lines:
++        if "upload_url" in line:
++            return line.split("=", 1)[1].strip()
++    return ""
++
++def parse_id_from_path(path):
++    # /tmp/smart/disk_data_pkg_0-5.bin
++    fname = os.path.basename(path)
++    xs = re.findall("[0-9]+", fname)
++    return [ int(x) for x in xs[0:2] ]
++
++def backup_file(path):
++    enc_id, port_id = parse_id_from_path(path)
++    cmd = "/sbin/da_util --backup_file enc_id=%d,port_id=%d,value=%s"%(enc_id, port_id, path)
++    os.system(cmd)
++
++def do_upload(enc_id, port_id, path):
++    url = get_upload_url(enc_id, port_id)
++    if len(url) == 0:
++        print "Can not get upload_url", enc_id, port_id  
++        return -1
++    
++    cmd = '/usr/local/bin/qcloud_blob_tool upload_only -u "%s" -p %s'%(url, path)
++    ret = os.system(cmd)
++    if ret != 0:
++        print ret, cmd
++    return ret
++
++def upload_disk_data():
++    path = sys.argv[2]
++    enc_id, port_id = parse_id_from_path(path)
++    ret = do_upload(enc_id, port_id, path)
++    if ret != 0:
++        backup_file(path) 
++        os._exit(ret)
++    else:
++        os._exit(0)
++
++def upload_backup_disk_data():
++    path = sys.argv[2]
++    enc_id, port_id = parse_id_from_path(path)
++    ret = do_upload(enc_id, port_id, path)
++    
++    if ret != 0:
++        os._exit(ret)
++    else:
++        os.remove(path)
++        os._exit(0)
++
+ def main():
+     func = getattr(sys.modules[__name__], sys.argv[1])
+     func()
+diff --git a/RootFS/init.d_509/disk_data_collection.sh b/RootFS/init.d_509/disk_data_collection.sh
+index e9a1f141465..45fb97795f9 100755
+--- a/RootFS/init.d_509/disk_data_collection.sh
++++ b/RootFS/init.d_509/disk_data_collection.sh
+@@ -5,15 +5,14 @@ FILE_HAL_CONF="/etc/hal.conf"
+ FILE_DISK_DATA="/tmp/smart/disk_data"
+ 
+ CMD_GETCFG="/sbin/getcfg"
+-CMD_ECHO="/bin/echo"
+-CMD_SLEEP="/bin/sleep"
+ CMD_HAL_APP="/sbin/hal_app"
+-CMD_QCLOUD_BLOB_TOOL_UPLOAD="/usr/local/bin/qcloud_blob_tool upload -c 5c4fc381ab6dd106bb803b3b"
+-CMD_QCLOUD_BLOB_TOOL_REQUEST_URL="/usr/local/bin/qcloud_blob_tool request_url_only -c 5c4fc381ab6dd106bb803b3b"
+-CMD_QCLOUD_BLOB_TOOL_UPLOAD_BY_URL="/usr/local/bin/qcloud_blob_tool upload_only -u"
+ 
+ FIELD_MAX_DISK_NUM="max_disk_num"
+ 
++
++# upload all backup files
++/sbin/da_util --upload_backup_file value=1
++
+ # traverse all disk in each enclosure, generate disk data and upload file to the qcloud
+ for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
+ {
+@@ -22,15 +21,13 @@ for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
+ 		model=`$CMD_GETCFG -f $FILE_HAL_CONF "Enclosure_$enc_id" model`
+ 		/bin/echo $model | grep "TR-" >> /dev/null
+ 		if [ $? == 0 ]; then
+-                        continue
+-                #else
+-                #        echo [$model]
+-                fi
++						continue
++				#else
++				#		 echo [$model]
++				fi
+ 
+-		#$CMD_ECHO "[$enc_id] max_disk_num $max_port_num"
+ 		for ((port_id=1;port_id<=$max_port_num;port_id++))
+ 		{
+-			#$CMD_ECHO "    [$enc_id] [$port_id]"
+ 			$CMD_GETCFG -f /etc/enclosure_$enc_id.conf PhysicalDisk_$port_id port_id >> /dev/null
+ 			if [ $? != 0 ]; then
+ 				continue
+@@ -38,11 +35,7 @@ for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
+ 			log_name=`hal_app --pd_get_log_name enc_id=$enc_id,port_id=$port_id`
+ 			$CMD_HAL_APP --pd_sys_get_data_package enc_id=$enc_id,port_id=$port_id
+ 			if [ $? == 0 ]; then
+-#				$CMD_QCLOUD_BLOB_TOOL_UPLOAD -d "{\"enc_id\": $enc_id, \"port_id\": $port_id }" -l /tmp/smart/disk_data_pkg_$enc_id-$port_id.bin >> /dev/null
+-#				$CMD_SLEEP 3
+-				URL=`$CMD_QCLOUD_BLOB_TOOL_REQUEST_URL -d "{\"enc_id\": $enc_id, \"port_id\": $port_id }" | grep upload_url | cut -c 12-10000`
+-				$CMD_ECHO $URL > /dev/kmsg
+-				$CMD_QCLOUD_BLOB_TOOL_UPLOAD_BY_URL $URL -p /tmp/smart/disk_data_pkg_$enc_id-$port_id.bin
++				python /usr/local/bin/da_util.pyc upload_disk_data /tmp/smart/disk_data_pkg_$enc_id-$port_id.bin
+ 				if [ $? == 0 ]; then
+ 					/usr/local/sbin/notify send -A "A002" -C "C004" -l "info" -t 3 -M "872" "[{0}] Uploaded disk analysis data. Disk: {1}." "%V026%" "$log_name"
+ 				else

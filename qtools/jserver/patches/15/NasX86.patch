@@ -1,0 +1,143 @@
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 41f9665e168..09f827f0ba2 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -11816,6 +11816,81 @@ int hash_string_by_sha256sum(IN char *string, OUT char *result, IN int result_le
+     return 0;
+ }
+ 
++void da_popen(char *cmd, char *buf)
++{
++    FILE *fp = NULL;
++    char buf1[MAX_BUF_LEN] = {0};
++
++    fp = popen(cmd, "r");
++    if (fp)
++    {
++        fgets(buf1, sizeof(buf1), fp);
++        pclose(fp);
++    }
++    sprintf(buf, "%s", buf1);
++
++}
++
++void da_hash(char *buf)
++{
++    char hash_result[256] = {0};
++
++    if (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0)
++        sprintf(buf, "%s", hash_result);
++
++}
++
++void headfunc_serial_number(FILE *pOutput_File, int enc_id)
++{
++    char buf[256] = {0};
++    char cmd[MAX_BUF_LEN] = {0};
++
++    if (enc_id == 0)
++    {
++        HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
++    }
++    else
++    {
++        snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
++        da_popen(cmd, buf);
++        if(strlen(buf) == 0)
++        {
++            ERR_TRACE(TRACE_ERROR, "Can not get serial number from enclosure : %d\n", enc_id);
++            HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
++        }
++    }
++
++    if(strlen(buf) != 0)
++    {
++        da_hash(buf);
++    }
++    fprintf(pOutput_File, "Serial Number: %s\n", buf);
++}
++
++void headfunc_host_id(FILE *pOutput_File, int enc_id)
++{
++    char buf[256] = {0};
++
++    if (enc_id == 0)
++    {
++        da_popen("/bin/hostname 2>/dev/null", buf);
++        if(strlen(buf) == 0)
++        {
++            HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
++        }
++    }
++    else
++    {
++        HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
++    }
++
++    if(strlen(buf) != 0)
++    {
++        da_hash(buf);
++    }
++    fprintf(pOutput_File, "Host ID: %s\n", buf);
++}
++
+ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_id, IN int port_id)
+ {
+     struct ata_smart_attribute *attribute_entry;
+@@ -11928,24 +12003,9 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+          * Serial Number:
+          * IF enc_id = 0 THEN [NAS Serial Number (eg. Q18AE00945) ]  else [EXPANSION Serial Number ]
+          */
+-        if (enc_id == 0)
+-        {
+-            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Serial Number: %s\n", buf);
+-        }
+-        else
+-        {
+-            memset(cmd, 0x0, MAX_BUF_LEN);
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
+-            fp = popen(cmd, "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Serial Number: %s", buf);
+-                pclose(fp);
+-            }
+-        }
++        headfunc_serial_number(pOutput_File, enc_id);
++
++
+         if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf, sizeof(buf)) >= 0) &&
+             (Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Build Number", buf2, sizeof(buf2)) >= 0))
+             fprintf(pOutput_File, "Firmware Version: %s (%s)\n", buf, buf2);
+@@ -11954,27 +12014,7 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+          * Host ID:
+          * IF enc_id = 0  THEN  [NAS Device Name (eg. Chen-NASF93291) ], else [Host NAS Serial Number]
+          */
+-        if (enc_id == 0)
+-        {
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/hostname 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Host ID: %s", buf);
+-                pclose(fp);
+-            }
+-            else
+-            {
+-                if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                    fprintf(pOutput_File, "Host ID: %s\n", buf);
+-            }
+-        }
+-        else
+-        {
+-            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Host ID: %s\n", buf);
+-        }
++        headfunc_host_id(pOutput_File, enc_id);
+ 
+         fprintf(pOutput_File, "Rack Number: %d\n", enc_id);   // 1 based enclosure idenditifer
+         fprintf(pOutput_File, "Slot Number: %d\n", port_id);

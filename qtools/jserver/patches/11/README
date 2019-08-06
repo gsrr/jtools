@@ -1,0 +1,3 @@
+title=Spec #20940 [Disk Failure Analysis] disk/system data collection and upload to QNAP cloud error handing
+model=TS-ALL
+description=add upload error handle mechanism

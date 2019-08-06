@@ -8,7 +8,7 @@ import xml.etree.cElementTree as ET
 import subprocess
 
 gconfig = configparser.ConfigParser()
-gconfig.read('jserver.conf')
+gconfig.read('/etc/jserver.conf')
 
 def check_port(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -97,6 +97,28 @@ def gen_patch_cmd(repo):
 
 # python3 gen_commit_patch 1 (1 stands for bug number)
 def gen_commit_patch():
+    global gconfig
+    fpath = '%s/patches/%s'%(gconfig['basic']['jserver_path'], sys.argv[2])
+    tree = ET.ElementTree(file='%s/manifest'%fpath)
+    root = tree.getroot()
+    src = root.attrib['src']
+    basedir = os.getcwd()
+    for proj in root:
+        print (proj.tag, proj.attrib)
+        src_repo = "%s/%s"%(src, proj.attrib['name'])
+        tmpdir = os.getcwd()
+        os.chdir(src_repo)
+        cmd = gen_patch_cmd(proj.attrib['revision'])
+        print ("\tgenerate patch : %s"%(os.getcwd()))
+        os.system("%s > %s/%s.patch"%(cmd, fpath, proj.attrib['name']))
+        os.chdir(tmpdir)
+
+def gen_patch_cmd_with_remote(repo):
+    cmd = "git diff origin/%s..HEAD"%repo
+    return cmd
+
+# python3 gen_commit_patch_with_remote 1 (1 stands for bug number)
+def gen_commit_patch_with_remote():
     fpath = os.path.abspath('patches/%s'%sys.argv[2])
     tree = ET.ElementTree(file='%s/manifest'%fpath)
     root = tree.getroot()
@@ -106,7 +128,7 @@ def gen_commit_patch():
         print (proj.tag, proj.attrib)
         src_repo = "%s/%s"%(src, proj.attrib['name'])
         os.chdir(src_repo)
-        cmd = gen_patch_cmd(proj.attrib['revision'])
+        cmd = gen_patch_cmd_with_remote(proj.attrib['revision'])
         print ("\tgenerate patch : %s"%(os.getcwd()))
         os.system("%s > %s/%s.patch"%(cmd, fpath, proj.attrib['name']))
 
@@ -114,7 +136,8 @@ def do_commit_patch():
     pass
 
 def read_manifest():
-    fpath = os.path.abspath('patches/%s'%sys.argv[2])
+    global gconfig
+    fpath = '%s/patches/%s'%(gconfig['basic']['jserver_path'], sys.argv[2])
     tree = ET.ElementTree(file='%s/manifest'%fpath)
     root = tree.getroot()
     return root
@@ -143,7 +166,7 @@ def gen_diff_files(repo):
 def decor_gen_commit_msg(func):
     def wrap_func():
         root = read_manifest()
-        src = "/mnt_%s"%root.attrib['src']
+        src = root.attrib['src']
         basedir = os.path.abspath(os.getcwd())
         for proj in root:
             print (proj.tag, proj.attrib)
@@ -160,7 +183,7 @@ def dump_dic_to_file(dst, cfg):
     with open(dst, "w") as fw:
         for key in order:
             if key == "title":
-                fw.write("%s\n"%cfg['title'])
+                fw.write("%s\n\n"%cfg['title'])
             else:
                 fw.write("%s\n"%key)
                 fw.write(" " * 4 + "%s\n"%cfg[key])
@@ -172,7 +195,7 @@ def gen_commit_msg(name, files):
     msg_cfg['related files'] = files
     dump_dic_to_file("%s/%s.msg"%(ppath, name), msg_cfg)
 
-def gen_patch():
+def gen_new_number():
     base_num = int(sys.argv[2])
     ps = [ int(x) for x in os.listdir("./patches") ]
     max_ps = max(ps) + 1
@@ -182,28 +205,69 @@ def gen_patch():
     os.mkdir(dst_dir)
     os.system("cp %s/manifest %s"%(base_dir, dst_dir))
     os.system("cp %s/README %s"%(base_dir, dst_dir))
+    print ("new number is %d"%max_ps)
 
 # patch -p1 -i ../CVE-2015-1038.patch
 def exec_patch():
     global gconfig
+    bconfig = gconfig['basic']
     lconfig = gconfig['build_server']
     root = read_manifest()
     for proj in root:
         cmd = "patch -p1 -i %s -d %s"
         print (proj.attrib['path'], proj.attrib['name'])
-        patch_path = os.path.abspath('patches/%s/%s.patch'%(sys.argv[2], proj.attrib['name']))
+        patch_path = '%s/patches/%s/%s.patch'%(bconfig['jserver_path'], sys.argv[2], proj.attrib['name'])
         target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])
         cmd = cmd%(patch_path, target_path)
         print (cmd)
         os.system(cmd)
 
+# patch -R -p1 -i ../CVE-2015-1038.patch
+def reverse_patch():
+    global gconfig
+    bconfig = gconfig['basic']
+    lconfig = gconfig['build_server']
+    root = read_manifest()
+    for proj in root:
+        cmd = "patch -R -p1 -i %s -d %s"
+        print (proj.attrib['path'], proj.attrib['name'])
+        patch_path = '%s/patches/%s/%s.patch'%(bconfig['jserver_path'], sys.argv[2], proj.attrib['name'])
+        if os.path.exists(patch_path) == False:
+            continue
+
+        target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])
+        cmd = cmd%(patch_path, target_path)
+        print (cmd)
+        os.system(cmd)
+
+def copy_patch():
+    cmd = "rsync -a %s %s"
+    patch_path = os.path.abspath('patches/%s'%(sys.argv[2]))
+    lconfig = gconfig['git_server']
+    target_path = "/mnt_%s/root/"%(lconfig['host'])
+    cmd = cmd%(patch_path, target_path)
+    print (cmd)
+    os.system(cmd)
+
+def re_exec_patch():
+    reverse_patch()
+    gen_commit_patch()
+    exec_patch()
+
+def gen_deploy_file():
+    pass
+
 def help():
     cmds = [
         'python3 jserver.py init',
-        'python3 jserver.py gen_patch $base_num',
+        'python3 jserver.py gen_new_number $base_num',
         'python3 jserver.py gen_commit_msg $patch_num',
         'python3 jserver.py gen_commit_patch $patch_num',
+        'python3 jserver.py gen_commit_patch_with_remote $patch_num',
         'python3 jserver.py exec_patch $patch_num',
+        'python3 jserver.py reverse_patch $patch_num',
+        'python3 jserver.py copy_patch $patch_num',
+        'python3 jserver.py re_exec_patch $patch_num',
     ]
     for cmd in cmds:
         print(cmd)

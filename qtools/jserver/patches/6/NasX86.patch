@@ -13,7 +13,7 @@ index 4c2dbfdaa40..bea39c9c26e 100644
  struct da_temp_info {
      int len;
 diff --git a/NasLib/hal/hal_event.h b/NasLib/hal/hal_event.h
-index 2d5aae9caf5..d899793e502 100755
+index 2d5aae9caf5..91660844cc5 100755
 --- a/NasLib/hal/hal_event.h
 +++ b/NasLib/hal/hal_event.h
 @@ -161,6 +161,7 @@ typedef enum {
@@ -24,6 +24,14 @@ index 2d5aae9caf5..d899793e502 100755
  } SCSI_CMD_HALTYPE;
  
  typedef struct
+@@ -268,6 +269,7 @@ typedef struct
+         struct __netlink_pd_scsi_cmd_err
+         {
+             int action; // retry = 0, fail = 1
++            int value; 
+             int scsi_bus[4];
+             unsigned char error_scsi_cmd[16];
+         } __attribute__ ((__packed__)) netlink_pd_scsi_cmd_err;
 diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
 index c8b5cf1c46d..de243e1d15f 100755
 --- a/NasLib/hal/hal_pd.c
@@ -78,11 +86,51 @@ index a84488d59c0..633a8987a15 100755
              tmp->len = ULINK_TEMPLATE_SIZE;
              break;
          default:
+diff --git a/NasUtil/hal_util/hal_util.h b/NasUtil/hal_util/hal_util.h
+index 940749760ed..3f98c425ad3 100755
+--- a/NasUtil/hal_util/hal_util.h
++++ b/NasUtil/hal_util/hal_util.h
+@@ -773,3 +773,7 @@ typedef struct _translate_table
+ 
+ #define ULINK_INQUIRY               0x12
+ 
++#define COMBINE_TWO_BYTES(b1, b2) ((b1 & 0xff) << 8) | (b2 & 0xff)
++#define COMBINE_FOUR_BYTES(b1, b2, b3, b4) (((b1 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b3 & 0xff) << 8) | (b4 & 0xff))
++#define GET_BIT_VALUE(v, p) ((v >> (p - 1)) & 0x01)   
++
 diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
-index 389383f016a..08e7ee79ca0 100755
+index 389383f016a..d1148f11ab7 100755
 --- a/NasUtil/hal_util/hal_util_pd.c
 +++ b/NasUtil/hal_util/hal_util_pd.c
-@@ -2890,6 +2890,12 @@ static void scsicmd_err_dispatch_latency(char *sn, int cmdtype)
+@@ -2875,10 +2875,24 @@ static void scsicmd_err_dispatch_fail(char *sn, int cmdtype)
+             break;
+     }
+ }
+-static void scsicmd_err_dispatch_latency(char *sn, int cmdtype)
++static void scsicmd_err_dispatch_latency(PD_INFO *pd_info, int cmdtype, int value, int transfer_size)
+ {
+-    UTIL_Debug(TRACE_WARNING, "dispatch latency: %d\n", cmdtype);    
+-
++    char *sn = pd_info->serial_no;
++    int max_latency = 0;
++    if(cmdtype == 99)
++    {
++        return;
++    }
++	UTIL_Debug(TRACE_WARNING, "dispatch latency: %d, value = %d, transfer_size = %d\n", cmdtype, value, transfer_size); 
++    if((pd_info->capabilities & PD_CAP_SSD) == 0)
++    {
++        max_latency = 1000 + (transfer_size / 256) * 2;
++        if(value < max_latency)
++        {
++	        UTIL_Debug(TRACE_WARNING, "it doesn't over max latency : (value = %d, max_latency = %d)\n", value, max_latency); 
++            return;
++        }
++    }
+     switch (cmdtype) {
+         case 0:
+             PD_Inc_ATA_ErrCnt(sn, 201, 6);
+@@ -2890,6 +2904,12 @@ static void scsicmd_err_dispatch_latency(char *sn, int cmdtype)
              break;
      }
  }
@@ -95,14 +143,142 @@ index 389383f016a..08e7ee79ca0 100755
  static int atacmd_type_dispatch(unsigned char tfcmd)
  {
      int cmdtype = -1;
-@@ -3003,6 +3009,10 @@ static void scsicmd_err_dispatch(char *sn, int action, unsigned char *scmd)
+@@ -2942,35 +2962,96 @@ static int atacmd_type_dispatch(unsigned char tfcmd)
+ }
+ 
+ 
++
++static int get_ata_passthrough_16_transfer_size(PD_INFO *pd_info, unsigned char *scmd)
++{
++    int transfer_size;
++    int t_length = scmd[2] & 0x03;
++    UTIL_Debug(TRACE_WARNING, "get_ata_passthrough_16_transfer_size: %d\n", t_length);    
++    switch(t_length)
++    {
++        case 1:
++            transfer_size = COMBINE_TWO_BYTES(scmd[3], scmd[4]);
++            break;
++        case 2:
++            transfer_size = COMBINE_TWO_BYTES(scmd[5], scmd[6]);
++            break;
++        default:
++            return 0;
++            break;
++    }
++
++    if(GET_BIT_VALUE(scmd[2], 3) == 0)
++    {
++       return  transfer_size / 512;
++    }
++
++    UTIL_Debug(TRACE_WARNING, "get_ata_passthrough_16_transfer_size: test : %d\n", (transfer_size * pd_info->sector_size) / 512);    
++    if(GET_BIT_VALUE(scmd[2], 5) == 0)
++    {
++       return transfer_size;
++    }
++    else
++    {
++        return (transfer_size * pd_info->sector_size) / 512; 
++    }
++
++
++
++    
++    
++    
++}
++
+ /*
+  * 0 --> READ
+  * 1 --> WRITE
+  * 2 --> IDENTIFY
+  * 99 --> OTHERS
+  */
+-static int scsicmd_type_dispatch(unsigned char *scmd)
++static int scsicmd_type_dispatch(PD_INFO *pd_info, unsigned char *scmd, int *transfer_size)
+ {
+     unsigned char scsi_op = scmd[0];
+     int cmdtype = 99;
+ 
+     switch (scsi_op) {
+-        case ULINK_READ_6:
++        case ULINK_READ_6: // obsolete
++            cmdtype = 0;
++            break;
+         case ULINK_READ_10:
++            cmdtype = 0;
++            *transfer_size = COMBINE_TWO_BYTES(scmd[7], scmd[8]);
++            break;
+         case ULINK_READ_16:
+             cmdtype = 0;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
+             break;
+             
+-        case ULINK_WRITE_6:
++        case ULINK_WRITE_6: //obsolete
++            cmdtype = 1;
++            break;
++
+         case ULINK_WRITE_10:
++            cmdtype = 1;
++            *transfer_size = COMBINE_TWO_BYTES(scmd[7], scmd[8]);
++            break;
++            
+         case ULINK_WRITE_16:
+-        case ULINK_WRITE_SAME_16:
+             cmdtype = 1;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
++            break;
++
++        case ULINK_WRITE_SAME_16: //Illegal Request - invalid/unsupported command code
++            cmdtype = 1;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
+             break;
+ 
+         case ULINK_ATA_16:
++            *transfer_size = get_ata_passthrough_16_transfer_size(pd_info, scmd);
+             cmdtype = atacmd_type_dispatch(scmd[14]);
+             break;
+         case ULINK_ATA_12:
++            *transfer_size = 0; // Max 255 blocks in ata pass through 12
+             cmdtype = atacmd_type_dispatch(scmd[9]);
+             break;  
+         case ULINK_INQUIRY:
+@@ -2986,11 +3067,13 @@ static int scsicmd_type_dispatch(unsigned char *scmd)
+     return cmdtype;
+ }
+ 
+-static void scsicmd_err_dispatch(char *sn, int action, unsigned char *scmd)
++static void scsicmd_err_dispatch(PD_INFO *pd_info, int action, int value, unsigned char *scmd)
+ {
++    char *sn = pd_info->serial_no;
+     int cmdtype = -1;
++    int transfer_size = 0;
+ 
+-    cmdtype = scsicmd_type_dispatch(scmd);
++    cmdtype = scsicmd_type_dispatch(pd_info, scmd, &transfer_size);
+     if(action == 0)
      {
-         scsicmd_err_dispatch_latency(sn, cmdtype);
+         scsicmd_err_dispatch_retry(sn, cmdtype);
+@@ -3001,7 +3084,11 @@ static void scsicmd_err_dispatch(char *sn, int action, unsigned char *scmd)
      }
+     else if(action == 2)
+     {
+-        scsicmd_err_dispatch_latency(sn, cmdtype);
++        scsicmd_err_dispatch_latency(pd_info, cmdtype, value, transfer_size);
++    }
 +    else if(action == 3)
 +    {
 +        scsicmd_err_dispatch_timesout(sn, cmdtype);
-+    }
+     }
  }
  static void atacmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct __netlink_pd_ata_qc_err *netlink_ata_qc)
- {
+@@ -3049,7 +3136,7 @@ static void scsicmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct
+         return;
+     }
+     UTIL_Debug(TRACE_WARNING, "scsicmd retry/error/latency:(%s, %d, %x)\n", pd_info.serial_no, netlink_scsi_cmd->action, netlink_scsi_cmd->error_scsi_cmd[0]);    
+-    scsicmd_err_dispatch(pd_info.serial_no, netlink_scsi_cmd->action, netlink_scsi_cmd->error_scsi_cmd);
++    scsicmd_err_dispatch(&pd_info, netlink_scsi_cmd->action, netlink_scsi_cmd->value, netlink_scsi_cmd->error_scsi_cmd);
+ }
+ 
+ static int pd_evt_func(EVT_FUNC_ARG arg)

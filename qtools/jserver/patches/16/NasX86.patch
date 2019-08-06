@@ -1,0 +1,391 @@
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index 3234bab876b..82d1ef660e0 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
+ CC = ${CROSS_COMPILE}gcc
+ CFLAGS = -Wall -O2
+ 
+-DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c da_backup.c
+-DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o da_backup.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c da_backup.c da_sata.c da_lib.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o da_backup.o da_sata.o da_lib.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_iotest.c b/NasUtil/da_util/da_iotest.c
+index ec6dba4b3f0..ffbd9e0722e 100644
+--- a/NasUtil/da_util/da_iotest.c
++++ b/NasUtil/da_util/da_iotest.c
+@@ -39,6 +39,7 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+ {
+     char buf[1024] = {0};
+     int ret = -1;
++    int fd;
+     unsigned int val = 0;
+ 
+     struct ulink_iotest_param params[4] = {
+@@ -63,7 +64,13 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+         // set template value;
+         val = fio_parse(buf, params[i].pos_fio);
+         printf("%s = (%s, %d)\n", sn, params[i].ioname, val);
++        fd = get_filelock(sn);
++        if(fd == -1)
++        {
++            continue;
++        }
+         PD_Set_ATA_IOTest_Val(sn, params[i].tnum, params[i].id, val/params[i].base);
++        release_filelock(fd, sn);
+     }
+ 
+ 
+diff --git a/NasUtil/da_util/da_lib.c b/NasUtil/da_util/da_lib.c
+new file mode 100644
+index 00000000000..bbe1abcb81e
+--- /dev/null
++++ b/NasUtil/da_util/da_lib.c
+@@ -0,0 +1,37 @@
++#include <stdio.h>
++#include <fcntl.h>
++
++int get_filelock(char *key)
++{
++    int cnt = 10;
++    int fd;
++    char fpath[64] = {0};
++    sprintf(fpath, "/tmp/lock.%s", key);
++
++    while(cnt > 0)
++    {
++        fd = open(fpath, O_RDWR | O_CREAT | O_EXCL, 0444);
++        if(fd == -1)
++        {
++            sleep(1);
++        }
++        else
++        {
++            return fd;
++        }
++        
++        cnt--;
++    }
++    unlink(fpath);
++    return open(fpath, O_RDWR | O_CREAT | O_EXCL, 0444);
++}
++
++void release_filelock(int fd, char *key)
++{
++    char fpath[64] = {0};
++    sprintf(fpath, "/tmp/lock.%s", key);
++
++    close(fd); 
++    unlink(fpath);
++}
++
+diff --git a/NasUtil/da_util/da_sata.c b/NasUtil/da_util/da_sata.c
+new file mode 100644
+index 00000000000..e9fba3e84d3
+--- /dev/null
++++ b/NasUtil/da_util/da_sata.c
+@@ -0,0 +1,36 @@
++#include "da_util.h"
++
++/* 
++ * ex: /sbin/da_util --ata_cnt_plus value=WD-WMAYP7858047:201:1 
++ * 
++ */
++int da_ata_cnt_plus(struct paras_in paras)
++{
++    int ret;
++    int fd;
++    char *value = paras.value;
++    char sn[128] = {0};
++    int tnum;
++    int id;
++
++	sscanf(value, "%[^:]:%d:%d", sn, &tnum, &id); 
++    printf("value = (%s, %d, %d)\n", sn, tnum, id);
++
++    fd = get_filelock(sn);
++    if(fd == -1)
++    {
++        return -1;
++    }
++	ret = PD_Inc_ATA_ErrCnt(sn, tnum, id);
++    release_filelock(fd, sn);
++
++    printf("disk_sys_inc_ata_errcnt: ret = %d\n", ret);
++	return 0;
++}
++
++
++
++
++
++
++
+diff --git a/NasUtil/da_util/da_system.c b/NasUtil/da_util/da_system.c
+index a17fba5cb7b..5f5e78bb38e 100644
+--- a/NasUtil/da_util/da_system.c
++++ b/NasUtil/da_util/da_system.c
+@@ -124,13 +124,50 @@ int da_system_raid_info(struct paras_in paras)
+     return 0;
+ }
+ 
++void parse_sn_from_name(char *name, char *sn)
++{
++    int s = strlen("disk_data_");
++    int e;
++    int i;
++    
++    for(e = strlen(name) - 1; e > -1 ; e--)
++    {
++        if(name[e] == '_')
++        {
++            break;
++        }
++    }
++    
++    for(i = s ; i < e ; i++)
++    {
++        sn[i - s] = name[i];
++    }
++    sn[i] = '\0';
++}
++
++int name_start_with(char *prefix, char *name)
++{
++    int i;
++    for(i = 0 ; i < strlen(prefix) ; i++)
++    {
++        if(prefix[i] != name[i])
++        {
++            return -1;
++        }
++    }
++    return 0;
++}
++
++// disk_data_WD-WMAYP0E2R7DK_16
+ int da_system_reset_cnt(struct paras_in paras)
+ {
++    int fd;
+     char *path = NAS_DISK_DATA_LOCATION;
+     struct dirent *de;
+     DIR *dr = opendir(path);
+     char buf[512] = {0};
+-
++    char sn[128] = {0};
++ 
+     if (dr == NULL)
+     {
+         printf("Could not open current directory" );
+@@ -143,9 +180,21 @@ int da_system_reset_cnt(struct paras_in paras)
+         {
+             continue;
+         }
++        if (name_start_with("disk_data_", de->d_name) != 0)
++        {
++            printf("The file name is invalid : %s\n", de->d_name);
++            continue;
++        }
++        parse_sn_from_name(de->d_name, sn);
+         sprintf(buf, "%s/%s", path, de->d_name);
+-        printf("remove file: %s\n", buf);
++        printf("remove file: %s, sn=%s\n", buf, sn);
++        fd = get_filelock(sn);
++        if(fd == -1)
++        {
++            continue;
++        }
+         unlink(buf);
++        release_filelock(fd, sn);
+     }
+ 
+     closedir(dr);
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index 2b537b4db2a..84378dd7e0b 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -1,4 +1,6 @@
+ 
++#define _XOPEN_SOURCE
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -47,6 +49,7 @@ int da_system_raid_info(struct paras_in);
+ int da_gen_header(struct paras_in);
+ int da_backup_file(struct paras_in);
+ int da_upload_backup_file(struct paras_in);
++int da_ata_cnt_plus(struct paras_in);
+ 
+ /*== end:function_declare_area ==*/
+ 
+@@ -67,6 +70,7 @@ static struct FuncStruct func_array[] = {
+     {"gen_header", da_gen_header},
+     {"backup_file", da_backup_file},
+     {"upload_backup_file", da_upload_backup_file},
++    {"ata_cnt_plus", da_ata_cnt_plus},
+     {"", NULL},
+ };
+ 
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index c1db6f01eaf..64a8ddd9c3e 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -78,7 +78,6 @@ extern pthread_mutex_t hal_util_mutex;
+ extern ENC_MONITOR_OBJ* se_add(int enc_id, time_t time_stamp);
+ extern int se_remove(int enc_id, time_t time_stamp);
+ extern int get_pd_highest_temp(ENC_MONITOR_OBJ *enc, int *pd_index, IN FAN_REGION region_idx);
+-extern int PD_Inc_ATA_ErrCnt(char *sn, int tnum, int id);
+ 
+ typedef enum _SSD_LIFE_WARNING_LEVEL
+ {
+@@ -2791,22 +2790,30 @@ static int sg_get_type(char *dev_sys_id)
+ }
+ 
+ 
++void da_ata_cnt_plus(char *sn, int tnum, int cellid)
++{
++    char cmd[256] = {0};
++    sprintf(cmd, "/sbin/da_util --ata_cnt_plus value=%s:%d:%d", sn, tnum, cellid);
++    UTIL_Debug(TRACE_WARNING, "da_ata_cnt_plus: %s\n", cmd);    
++    system(cmd);
++}
++
+ static void ataqc_err_dispatch(char *sn, unsigned char state, unsigned char err)
+ {
+     if ((state & ATA_DRDY) != 1)
+-        PD_Inc_ATA_ErrCnt(sn, 202, 1);
++        da_ata_cnt_plus(sn, 202, 1);
+ 
+     if (err) {
+         if (err & ATA_ICRC) 
+-            PD_Inc_ATA_ErrCnt(sn, 16, 1);
++            da_ata_cnt_plus(sn, 16, 1);
+         if (err & ATA_UNC)  
+-            PD_Inc_ATA_ErrCnt(sn, 16, 2);
++            da_ata_cnt_plus(sn, 16, 2);
+         if (err & ATA_IDNF) 
+-            PD_Inc_ATA_ErrCnt(sn, 16, 3);
++            da_ata_cnt_plus(sn, 16, 3);
+         if (err & ATA_ABORTED)  
+-            PD_Inc_ATA_ErrCnt(sn, 16, 4);
++            da_ata_cnt_plus(sn, 16, 4);
+         if (err & ATA_AMNF) 
+-            PD_Inc_ATA_ErrCnt(sn, 16, 5);
++            da_ata_cnt_plus(sn, 16, 5);
+     }
+ }
+ 
+@@ -2815,25 +2822,25 @@ static void atalink_err_dispatch(char *sn, unsigned int serror)
+     if(serror)
+     {
+         if (serror & SERR_HANDSHAKE)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 6);
++            da_ata_cnt_plus(sn, 16, 6);
+         if (serror & SERR_CRC)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 7);
++            da_ata_cnt_plus(sn, 16, 7);
+         if (serror & SERR_DISPARITY)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 8);
++            da_ata_cnt_plus(sn, 16, 8);
+         if (serror & SERR_10B_8B_ERR)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 9);
++            da_ata_cnt_plus(sn, 16, 9);
+         if (serror & SERR_INTERNAL)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 10);
++            da_ata_cnt_plus(sn, 16, 10);
+         if (serror & SERR_PROTOCOL)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 11);
++            da_ata_cnt_plus(sn, 16, 11);
+         if (serror & SERR_PERSISTENT)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 12);
++            da_ata_cnt_plus(sn, 16, 12);
+         if (serror & SERR_DATA)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 13);
++            da_ata_cnt_plus(sn, 16, 13);
+         if (serror & SERR_COMM_RECOVERED)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 14);
++            da_ata_cnt_plus(sn, 16, 14);
+         if (serror & SERR_DATA_RECOVERED)
+-            PD_Inc_ATA_ErrCnt(sn, 16, 15);
++            da_ata_cnt_plus(sn, 16, 15);
+     }
+ }
+ static void scsicmd_err_dispatch_retry(char *sn, int cmdtype)
+@@ -2842,15 +2849,15 @@ static void scsicmd_err_dispatch_retry(char *sn, int cmdtype)
+ 
+     switch (cmdtype) {
+         case 0:
+-            PD_Inc_ATA_ErrCnt(sn, 201, 1);
++            da_ata_cnt_plus(sn, 201, 1);
+             break;
+             
+         case 1:
+-            PD_Inc_ATA_ErrCnt(sn, 201, 2);
++            da_ata_cnt_plus(sn, 201, 2);
+             break;
+ 
+         default:
+-            PD_Inc_ATA_ErrCnt(sn, 201, 3);
++            da_ata_cnt_plus(sn, 201, 3);
+             break;
+     }
+ }
+@@ -2860,18 +2867,18 @@ static void scsicmd_err_dispatch_fail(char *sn, int cmdtype)
+ 
+     switch (cmdtype) {
+         case 0:
+-            PD_Inc_ATA_ErrCnt(sn, 202, 3);
++            da_ata_cnt_plus(sn, 202, 3);
+             break;
+             
+         case 1:
+-            PD_Inc_ATA_ErrCnt(sn, 202, 2);
++            da_ata_cnt_plus(sn, 202, 2);
+             break;
+ 
+         case 2:
+-            PD_Inc_ATA_ErrCnt(sn, 202, 4);
++            da_ata_cnt_plus(sn, 202, 4);
+             break;
+         default:
+-            PD_Inc_ATA_ErrCnt(sn, 202, 5);
++            da_ata_cnt_plus(sn, 202, 5);
+             break;
+     }
+ }
+@@ -2895,10 +2902,10 @@ static void scsicmd_err_dispatch_latency(PD_INFO *pd_info, int cmdtype, int valu
+     }
+     switch (cmdtype) {
+         case 0:
+-            PD_Inc_ATA_ErrCnt(sn, 201, 6);
++            da_ata_cnt_plus(sn, 201, 6);
+             break;
+         case 1:
+-            PD_Inc_ATA_ErrCnt(sn, 201, 7);
++            da_ata_cnt_plus(sn, 201, 7);
+             break;
+         default:
+             break;
+@@ -2908,7 +2915,7 @@ static void scsicmd_err_dispatch_latency(PD_INFO *pd_info, int cmdtype, int valu
+ static void scsicmd_err_dispatch_timesout(char *sn, int cmdtype)
+ {
+     UTIL_Debug(TRACE_WARNING, "dispatch timesout: %d\n", cmdtype);    
+-    PD_Inc_ATA_ErrCnt(sn, 201, 10);
++    da_ata_cnt_plus(sn, 201, 10);
+ }
+ static int atacmd_type_dispatch(unsigned char tfcmd)
+ {
+diff --git a/RootFS/init.d_509/disk_data_collection.sh b/RootFS/init.d_509/disk_data_collection.sh
+index 45fb97795f9..9e062a6df01 100755
+--- a/RootFS/init.d_509/disk_data_collection.sh
++++ b/RootFS/init.d_509/disk_data_collection.sh
+@@ -48,3 +48,5 @@ for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
+ 	fi
+ }
+ 
++da_util --system_reset_cnt all
++

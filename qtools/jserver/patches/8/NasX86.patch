@@ -1,0 +1,114 @@
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+index 6c7dc7ed5fc..833a595cf3b 100644
+--- a/NasUtil/da_util/da_sas.c
++++ b/NasUtil/da_util/da_sas.c
+@@ -199,6 +199,16 @@ void gen_inquiry_vpd_cmd(unsigned char *cmd, unsigned char op, int len)
+     cmd[5] = 0x00;
+ }
+ 
++void gen_standard_inquiry_cmd(unsigned char *cmd, unsigned char op, int len)
++{
++    cmd[0] = INQ_CMD_CODE;
++    cmd[1] = 0x00;
++    cmd[2] = 0x00;
++    cmd[3] = 0xff & (len >> 8);
++    cmd[4] = 0xff & len;
++    cmd[5] = 0x00;
++}
++
+ void get_sup_vpds(int sg_fd)
+ {
+     int i, ret, plen;
+@@ -231,6 +241,31 @@ void get_sup_vpds(int sg_fd)
+     len_sup_vpds = plen;
+ }
+ 
++int send_standard_inquiry_command(int sg_fd, unsigned char op, int data_fd)
++{
++    int len = -1;
++    int ret;
++    unsigned char cmd[INQ_CMD_LEN];
++    unsigned char buf[INQ_REPLY_LEN];
++    struct scsi_paras sparas;
++
++    gen_standard_inquiry_cmd(cmd, op, sizeof(buf));
++
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_standard_inquiry_command fail : (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = 5 + buf[4];
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
+ int send_inquiry_vpd_command(int sg_fd, unsigned char op, int data_fd)
+ {
+     int len = -1;
+@@ -238,7 +273,6 @@ int send_inquiry_vpd_command(int sg_fd, unsigned char op, int data_fd)
+     unsigned char cmd[INQ_CMD_LEN];
+     unsigned char buf[INQ_REPLY_LEN];
+     struct scsi_paras sparas;
+-    int i;
+     
+     if(is_support(op, sup_vpds, len_sup_vpds) != 0)
+     {
+diff --git a/NasUtil/da_util/da_sas.h b/NasUtil/da_util/da_sas.h
+index fca0041f2e8..140de07c62d 100644
+--- a/NasUtil/da_util/da_sas.h
++++ b/NasUtil/da_util/da_sas.h
+@@ -6,7 +6,7 @@
+ #define DEFECT12_LEN_COMB(v1, v2, v3, v4) (((v1 & 0xff) << 24) | ((v2 & 0xff) << 16) | ((v3 & 0xff) << 8) | (v4 & 0xff))
+ 
+ 
+-#define INQ_REPLY_LEN 96
++#define INQ_REPLY_LEN 8192
+ #define INQ_CMD_CODE 0x12
+ #define INQ_CMD_LEN 6
+ 
+@@ -80,8 +80,9 @@ int send_read_capacity_10(int sg_fd, unsigned char op, int data_fd);
+ int send_read_capacity_16(int sg_fd, unsigned char op, int data_fd);
+ int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd);
+ int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd);
++int send_standard_inquiry_command(int sg_fd, unsigned char op, int data_fd);
+ 
+-#define SAS_FUNC_NUM 28
++#define SAS_FUNC_NUM 29
+ 
+ struct sasfunc funcs[SAS_FUNC_NUM] = {
+     {PAGE_CODE_WRITE_ERROR_COUNTER, 301, send_log_sense_command},
+@@ -112,6 +113,7 @@ struct sasfunc funcs[SAS_FUNC_NUM] = {
+     {READ_CAPACITY_16, 331, send_read_capacity_16},
+     {READ_DEFECT_DATA_12_GLIST, 332, send_read_defect_data_12},
+     {READ_DEFECT_DATA_12_PLIST, 333, send_read_defect_data_12},
++    {INQ_CMD_CODE, 334, send_standard_inquiry_command},
+ };
+ 
+ struct nas_paras {
+diff --git a/NasUtil/da_util/test_da_sas.py b/NasUtil/da_util/test_da_sas.py
+index 6d930e9d1b2..38e4630220f 100644
+--- a/NasUtil/da_util/test_da_sas.py
++++ b/NasUtil/da_util/test_da_sas.py
+@@ -26,12 +26,15 @@ def read_data(path, offset, length, tnum):
+         print length,  8 + (ord(data[offset + 4]) << 24) + (ord(data[offset + 5]) << 16) + (ord(data[offset + 6])
+         << 8 ) + ord(data[offset + 7])
+ 
++    if tnum == 334:
++        print length,  8 + ord(data[offset + 4])
++
+ def read_sas_header(path):
+     recs = []
+     with open(path, "r") as fr:
+         lines = fr.readlines()
+         for line in lines:
+-            if "Record" in line:
++            if "Record" in line and "Records" not in line:
+                 recs.append(line.strip().split()[-1])
+     
+     for i in xrange(0, len(recs), 3):

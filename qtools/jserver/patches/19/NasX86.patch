@@ -1,0 +1,22 @@
+diff --git a/NasLib/hal/hal_sys_enc.c b/NasLib/hal/hal_sys_enc.c
+index bbe62926999..d7153f3b38e 100755
+--- a/NasLib/hal/hal_sys_enc.c
++++ b/NasLib/hal/hal_sys_enc.c
+@@ -13754,7 +13754,7 @@ int se_sys_set_disk_data_collection(IN int enable)
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
+-            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=1");
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=1 >> /dev/null");
+             system(cmd);
+         }
+         else if (enable == 0)
+@@ -13763,7 +13763,7 @@ int se_sys_set_disk_data_collection(IN int enable)
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
+-            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=0");
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=0 >> /dev/null");
+             system(cmd);
+         }
+         ret = 0;

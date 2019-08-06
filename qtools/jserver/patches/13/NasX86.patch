@@ -1,0 +1,13 @@
+diff --git a/NasUtil/hal_util/hal_util_main.c b/NasUtil/hal_util/hal_util_main.c
+index 819178faf46..fb34c11032a 100755
+--- a/NasUtil/hal_util/hal_util_main.c
++++ b/NasUtil/hal_util/hal_util_main.c
+@@ -3124,7 +3124,7 @@ int main(int argc, char** argv)
+     void *exit = NULL;
+     int ret = -1;
+ 
+-    system("/sbin/da_util --enable_by_cfg value=1");
++    system("/sbin/da_util --enable_by_cfg value=1 >> /dev/null");
+ 
+     if((ap_name = strrchr(argv[0], '/')) == NULL)
+         ap_name = argv[0];

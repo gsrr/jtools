@@ -1,0 +1,506 @@
+diff --git a/drivers/ata/libata-eh.c b/drivers/ata/libata-eh.c
+index 2caf58b92b60..822b93e5c73b 100755
+--- a/drivers/ata/libata-eh.c
++++ b/drivers/ata/libata-eh.c
+@@ -2501,6 +2501,31 @@ const char *ata_get_cmd_descript(u8 command)
+ }
+ EXPORT_SYMBOL_GPL(ata_get_cmd_descript);
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++static void ata_issue_link_err_event(struct ata_device *adev, unsigned int serror )
++{
++	struct scsi_device *sdev = adev->sdev;
++	NETLINK_EVT hal_event;
++	struct __netlink_pd_ata_link_err *netlink_pd;
++
++    if(!sdev)
++    {
++        printk("sta_issue_link_err_event: scsi device in ata device is null");
++        return;
++    }
++    printk("ata_issue_link_err_event:(%d:%d:%d:%d)", sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
++    hal_event.type = HAL_EVENT_GENERAL_DISK;
++    hal_event.arg.action = SET_PD_ATA_LINK_ERROR;
++    netlink_pd = &hal_event.arg.param.netlink_pd_ata_link_err;
++    netlink_pd->scsi_bus[0] = sdev->host->host_no;
++    netlink_pd->scsi_bus[1] = sdev->channel;
++    netlink_pd->scsi_bus[2] = sdev->id;
++    netlink_pd->scsi_bus[3] = sdev->lun;
++    netlink_pd->serror = serror;
++    send_hal_netlink(&hal_event);
++}
++#endif
++
+ /**
+  *	ata_eh_link_report - report error handling to user
+  *	@link: ATA link EH is going on
+@@ -2519,6 +2544,9 @@ static void ata_eh_link_report(struct ata_link *link)
+ 	int tag, nr_failed = 0;
+ 	struct scatterlist *sg;
+ 	unsigned int si;
++#if defined(CONFIG_MACH_QNAPTS)
++    struct ata_device *atadev;
++#endif
+ 
+ 	if (ehc->i.flags & ATA_EHI_QUIET)
+ 		return;
+@@ -2568,6 +2596,18 @@ static void ata_eh_link_report(struct ata_link *link)
+ 			ata_link_err(link, "%s\n", desc);
+ 	}
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++    atadev = ehc->i.dev;
++    if (!atadev && ((ata_link_max_devices(link) == 1 && ata_dev_enabled(link->device))))
++    {
++        atadev = link->device;
++    }
++    if(atadev)
++    {
++        ata_issue_link_err_event(atadev, ehc->i.serror);
++    }
++#endif
++
+ #ifdef CONFIG_ATA_VERBOSE_ERROR
+ 	if (ehc->i.serror)
+ 		ata_link_err(link,
+diff --git a/drivers/ata/libata-scsi.c b/drivers/ata/libata-scsi.c
+index 422b9d1181c8..d5135891ed18 100755
+--- a/drivers/ata/libata-scsi.c
++++ b/drivers/ata/libata-scsi.c
+@@ -2048,6 +2048,11 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
+ 	struct scsi_cmnd *cmd = qc->scsicmd;
+ 	u8 *cdb = cmd->cmnd;
+ 	int need_sense = (qc->err_mask != 0);
++#if defined(CONFIG_MACH_QNAPTS)
++	struct scsi_device *sdev = cmd->device;
++	NETLINK_EVT hal_event;
++	struct __netlink_pd_ata_qc_err *netlink_pd;
++#endif
+ 
+ 	/* For ATA pass thru (SAT) commands, generate a sense block if
+ 	 * user mandated it or if there's an error.  Note that if we
+@@ -2071,6 +2076,21 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
+ 	if (need_sense && !ap->ops->error_handler)
+ 		ata_dump_status(ap->print_id, &qc->result_tf);
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++    if (need_sense)
++    {
++        hal_event.type = HAL_EVENT_GENERAL_DISK;
++        hal_event.arg.action = SET_PD_ATA_QC_ERROR;
++        netlink_pd = &hal_event.arg.param.netlink_pd_ata_qc_err;
++        netlink_pd->scsi_bus[0] = sdev->host->host_no;
++        netlink_pd->scsi_bus[1] = sdev->channel;
++        netlink_pd->scsi_bus[2] = sdev->id;
++        netlink_pd->scsi_bus[3] = sdev->lun;
++        netlink_pd->state = qc->result_tf.command;
++        netlink_pd->err = qc->result_tf.feature;
++        send_hal_netlink(&hal_event);
++    }
++#endif
+ 	ata_qc_done(qc);
+ }
+ 
+diff --git a/drivers/qnap/hal_event.c b/drivers/qnap/hal_event.c
+index 71a2b89bc881..e10edba23332 100755
+--- a/drivers/qnap/hal_event.c
++++ b/drivers/qnap/hal_event.c
+@@ -14,6 +14,9 @@ static struct sock *hal_netlink;
+ DEFINE_SPINLOCK(hal_container_lock);
+ static LIST_HEAD(hal_container_head);
+ 
++int da_event_enable = 0;
++EXPORT_SYMBOL(da_event_enable);
++
+ typedef struct __HAL_NETLINK_CB {
+ 	struct list_head node;
+ 	NETLINK_EVT event;
+@@ -136,11 +139,35 @@ void retrieve_hal_container(void)
+ }
+ EXPORT_SYMBOL(retrieve_hal_container);
+ 
++#define DA_EVENT_LENGTH 3
++
++int is_da_event(NETLINK_EVT *hal_event)
++{
++    int arr[DA_EVENT_LENGTH] = {
++        SET_PD_SCSI_CMD_ERROR,
++        SET_PD_ATA_LINK_ERROR,
++        SET_PD_ATA_QC_ERROR,
++    };
++    int i;
++
++    for(i = 0 ; i < DA_EVENT_LENGTH; i++)
++    {
++        if(hal_event->arg.action == arr[i])
++        {
++            return 1;
++        }
++    }
++    return 0;
++}
+ 
+ int send_hal_netlink(NETLINK_EVT *hal_event)
+ {
+ 	HAL_NETLINK_CB *netlink_cb = NULL;
+ 
++    if(da_event_enable == 0 && is_da_event(hal_event))
++    {
++        return 0;   
++    }
+ 	netlink_cb = kmalloc(sizeof(HAL_NETLINK_CB), GFP_ATOMIC);
+ 
+ 	if (netlink_cb == NULL) {
+diff --git a/drivers/scsi/scsi_error.c b/drivers/scsi/scsi_error.c
+index 994d3258332e..71faff270a8e 100644
+--- a/drivers/scsi/scsi_error.c
++++ b/drivers/scsi/scsi_error.c
+@@ -48,6 +48,11 @@
+ 
+ #include <asm/unaligned.h>
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++#include <qnap/hal_event.h>
++#include "scsi_qnap.h"
++#endif
++
+ static void scsi_eh_done(struct scsi_cmnd *scmd);
+ 
+ /*
+@@ -281,6 +286,10 @@ enum blk_eh_timer_return scsi_times_out(struct request *req)
+ 	trace_scsi_dispatch_cmd_timeout(scmd);
+ 	scsi_log_completion(scmd, TIMEOUT_ERROR);
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++    printk("issue scsi timeout event\n");
++    scsi_cmd_issue_halevent(scmd, SCSI_CMD_HAL_TIMES_OUT);
++#endif
+ 	if (host->eh_deadline != -1 && !host->last_reset)
+ 		host->last_reset = jiffies;
+ 
+diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
+index 224d8223de3b..9593cb6f05a3 100755
+--- a/drivers/scsi/scsi_lib.c
++++ b/drivers/scsi/scsi_lib.c
+@@ -97,6 +97,7 @@ int scsi_init_sense_cache(struct Scsi_Host *shost)
+ 
+ #if defined(CONFIG_MACH_QNAPTS)
+ #include <qnap/hal_event.h>
++#include "scsi_qnap.h"
+ 
+ /* Patch by QNAP: SCSI batch wakeup */
+ #define MAX_ENCLOSURE_ID	64
+@@ -114,6 +115,42 @@ EXPORT_SYMBOL(wakeup_ring_buf);
+ EXPORT_SYMBOL(max_wakeup_pd_num);
+ #endif
+ 
++
++#if defined(CONFIG_MACH_QNAPTS)
++
++void scsi_cmd_issue_halevent2(struct scsi_cmnd *cmd, int action, int value)
++{
++    struct scsi_device *sdev = cmd->device;
++    NETLINK_EVT hal_event;
++    struct __netlink_pd_scsi_cmd_err *netlink_pd;
++
++    hal_event.type = HAL_EVENT_GENERAL_DISK;
++    hal_event.arg.action = SET_PD_SCSI_CMD_ERROR;
++    netlink_pd = &hal_event.arg.param.netlink_pd_scsi_cmd_err;
++    netlink_pd->action = action;
++    netlink_pd->value = value;
++    netlink_pd->scsi_bus[0] = sdev->host->host_no;
++    netlink_pd->scsi_bus[1] = sdev->channel;
++    netlink_pd->scsi_bus[2] = sdev->id;
++    netlink_pd->scsi_bus[3] = sdev->lun;
++    memcpy(netlink_pd->error_scsi_cmd, cmd->cmnd, cmd->cmd_len);
++    send_hal_netlink(&hal_event);
++}
++
++/*
++ * action = 0 --> retry
++ * action = 1 --> fail
++ * action = 2 --> long latency
++ */
++void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action)
++{
++    scsi_cmd_issue_halevent2(cmd, action, 0);
++}
++
++EXPORT_SYMBOL(scsi_cmd_issue_halevent);
++
++#endif
++
+ /*
+  * When to reinvoke queueing after a resource shortage. It's 3 msecs to
+  * not change behaviour from the previous unplug mechanism, experimentation
+@@ -1026,6 +1063,9 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
+ 	switch (action) {
+ 	case ACTION_FAIL:
+ 		/* Give up and fail the remainder of the request */
++#if defined(CONFIG_MACH_QNAPTS)
++        scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_FAIL);
++#endif
+ 		if (!(req->rq_flags & RQF_QUIET)) {
+ 			static DEFINE_RATELIMIT_STATE(_rs,
+ 					DEFAULT_RATELIMIT_INTERVAL,
+@@ -1098,6 +1138,9 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
+ 		/* Unprep the request and put it back at the head of the queue.
+ 		 * A new command will be prepared and issued.
+ 		 */
++#if defined(CONFIG_MACH_QNAPTS)
++        scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_RETRY);
++#endif
+ 		if (q->mq_ops) {
+ 			scsi_mq_requeue_cmd(cmd);
+ 		} else {
+@@ -1106,10 +1149,16 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
+ 		}
+ 		break;
+ 	case ACTION_RETRY:
++#if defined(CONFIG_MACH_QNAPTS)
++        scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_RETRY);
++#endif
+ 		/* Retry the same command immediately */
+ 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY, 0);
+ 		break;
+ 	case ACTION_DELAYED_RETRY:
++#if defined(CONFIG_MACH_QNAPTS)
++        scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_RETRY);
++#endif
+ 		/* Retry the same command after a delay */
+ 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY, 0);
+ 		break;
+@@ -1721,7 +1770,19 @@ static void scsi_softirq_done(struct request *rq)
+ 	int disposition;
+ 
+ 	INIT_LIST_HEAD(&cmd->eh_entry);
+-
++	
++#if defined(CONFIG_MACH_QNAPTS)
++    
++	if(cmd->device->param_latency > 0)
++	{
++        if (jiffies_to_msecs(cmd->jiffies_latency) > cmd->device->param_latency)
++        {
++            printk("%d, %9ph\n", cmd->jiffies_latency, cmd->cmnd);
++            scsi_cmd_issue_halevent2(cmd, SCSI_CMD_HAL_LONG_LATENCY, jiffies_to_msecs(cmd->jiffies_latency));
++        }
++	}
++    
++#endif
+ 	atomic_inc(&cmd->device->iodone_cnt);
+ 	if (cmd->result)
+ 		atomic_inc(&cmd->device->ioerr_cnt);
+@@ -1736,7 +1797,20 @@ static void scsi_softirq_done(struct request *rq)
+ 	}
+ 
+ 	scsi_log_completion(cmd, disposition);
+-
++	
++#if defined(CONFIG_MACH_QNAPTS)
++    if(disposition != SUCCESS)
++    {
++        if (disposition == FAILED)
++        {
++            scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_FAIL);
++        }
++        else
++        {
++            scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_RETRY);
++        }
++    }
++#endif
+ 	switch (disposition) {
+ 		case SUCCESS:
+ 			scsi_finish_command(cmd);
+@@ -1771,6 +1845,9 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+ 	struct scsi_device *sdev = cmd->device;
+ #endif
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++    cmd->jiffies_latency = jiffies;
++#endif
+ 	atomic_inc(&cmd->device->iorequest_cnt);
+ 
+ 	/* check if the device is still usable */
+@@ -1921,8 +1998,12 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+  */
+ static void scsi_done(struct scsi_cmnd *cmd)
+ {
++#if defined(CONFIG_MACH_QNAPTS)
++    cmd->jiffies_latency = jiffies - cmd->jiffies_latency;
++#endif
+ 	trace_scsi_dispatch_cmd_done(cmd);
+ 	blk_complete_request(cmd->request);
++
+ }
+ 
+ /*
+diff --git a/drivers/scsi/scsi_qnap.h b/drivers/scsi/scsi_qnap.h
+new file mode 100644
+index 000000000000..e7e0c69898cf
+--- /dev/null
++++ b/drivers/scsi/scsi_qnap.h
+@@ -0,0 +1,2 @@
++
++void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action);
+diff --git a/drivers/scsi/scsi_sysfs.c b/drivers/scsi/scsi_sysfs.c
+index ff97c235367e..1ae3750c0b95 100644
+--- a/drivers/scsi/scsi_sysfs.c
++++ b/drivers/scsi/scsi_sysfs.c
+@@ -865,6 +865,34 @@ static ssize_t show_qnap_dev_size_info(
+ static DEVICE_ATTR(qnap_dev_size_info, S_IRUGO | S_IWUSR, show_qnap_dev_size_info, NULL);
+ #endif
+ 
++static ssize_t show_qnap_param_latency(
++	struct device *dev,
++	struct device_attribute *attr,
++	char *buf
++	)
++{
++	struct scsi_device *sdev;
++
++	sdev = to_scsi_device(dev);
++	return snprintf(buf, 20, "%d\n", sdev->param_latency);
++}
++
++static ssize_t store_qnap_param_latency(
++	struct device *dev,
++	struct device_attribute *attr,
++	const char *buf, size_t count
++	)
++{
++	int val;
++	struct scsi_device *sdev = to_scsi_device(dev);
++
++	sscanf (buf, "%d\n", &val);
++	sdev->param_latency = val;
++	return count;
++}
++
++static DEVICE_ATTR(qnap_param_latency, S_IRUGO | S_IWUSR, show_qnap_param_latency, store_qnap_param_latency);
++
+ /* Workaroud to avoid that SCSI device removal through sysfs triggers a deadlock */
+ static void scsi_remove_device_async(struct scsi_device *sdev)
+ {
+@@ -1329,6 +1357,7 @@ static struct attribute *scsi_sdev_attrs[] = {
+ 	&dev_attr_qnap_probe_sd_done.attr,
+ 	&dev_attr_qnap_probe_sd_type.attr,
+ #endif
++	&dev_attr_qnap_param_latency.attr,
+ #endif
+ 	&dev_attr_rev.attr,
+ 	&dev_attr_rescan.attr,
+diff --git a/drivers/scsi/sd.c b/drivers/scsi/sd.c
+index 5a4426091d16..2f541c6e6546 100755
+--- a/drivers/scsi/sd.c
++++ b/drivers/scsi/sd.c
+@@ -3694,6 +3694,8 @@ static int sd_probe(struct device *dev)
+         lun_status[index-ISCSI_DEV_START_INDEX] = 1;
+     }
+ #endif
++	/* ULINK project: init latency value*/
++	sdp->param_latency = 0;
+ #endif
+ 	return 0;
+ 
+diff --git a/include/qnap/hal_event.h b/include/qnap/hal_event.h
+index 84ac1af45cb0..91660844cc55 100755
+--- a/include/qnap/hal_event.h
++++ b/include/qnap/hal_event.h
+@@ -24,6 +24,7 @@ typedef enum
+     HAL_EVENT_BBU,
+     HAL_EVENT_ZFS,
+     HAL_EVENT_MAX_EVT_NUM,
++    HAL_EVENT_CONTROL,
+ } EVT_FUNC_TYPE;
+ 
+ #ifndef USB_DRV_DEFINED
+@@ -76,6 +77,9 @@ typedef enum
+     SET_NCQ_BY_USER,
+     SET_NCQ_BY_KERNEL,
+     GET_PD_SMART,
++    SET_PD_ATA_QC_ERROR,    // for netlink
++    SET_PD_ATA_LINK_ERROR,    // for netlink
++    SET_PD_SCSI_CMD_ERROR,    // for netlink
+ 
+ // For RAID    
+     REPAIR_RAID_READ_ERROR = 100,   //1,5,6,10, for netlink,reconstruct
+@@ -149,8 +153,17 @@ typedef enum
+     ZFS_SCRUB_START,
+     ZFS_SCRUB_COMPLETE,
+     ZFS_SCRUB_CANCEL,
++// For EVENT_CONTROL
++    DA_EVENT_ENABLE,
+ } EVT_FUNC_ACTION;
+ 
++typedef enum {
++    SCSI_CMD_HAL_RETRY,
++    SCSI_CMD_HAL_FAIL,
++    SCSI_CMD_HAL_LONG_LATENCY,
++    SCSI_CMD_HAL_TIMES_OUT,
++} SCSI_CMD_HALTYPE;
++
+ typedef struct
+ {
+     EVT_FUNC_ACTION action;
+@@ -253,6 +266,24 @@ typedef struct
+             unsigned char error_sense_key[3]; //sense_key,ASC,ASCQ
+             unsigned char error_scsi_cmd[16];
+         } __attribute__ ((__packed__)) netlink_pd;
++        struct __netlink_pd_scsi_cmd_err
++        {
++            int action; // retry = 0, fail = 1
++            int value; 
++            int scsi_bus[4];
++            unsigned char error_scsi_cmd[16];
++        } __attribute__ ((__packed__)) netlink_pd_scsi_cmd_err;
++        struct __netlink_pd_ata_qc_err
++        {
++            int scsi_bus[4];
++            unsigned char state;
++            unsigned char err;
++        } __attribute__ ((__packed__)) netlink_pd_ata_qc_err;
++        struct __netlink_pd_ata_link_err
++        {
++            unsigned int serror;
++            int scsi_bus[4];
++        } __attribute__ ((__packed__)) netlink_pd_ata_link_err;
+         struct __netlink_raid_cb
+         {
+             int raid_id;
+@@ -362,6 +393,10 @@ typedef struct
+         {
+             int learning_action;
+         } __attribute__ ((__packed__)) bbu_learning;
++        struct __event_control
++        {
++            int value;
++        } __attribute__ ((__packed__)) event_control;
+     } param;
+ }__attribute__ ((__packed__))
+ EVT_FUNC_ARG;
+diff --git a/include/scsi/scsi_cmnd.h b/include/scsi/scsi_cmnd.h
+index 7bc752fc98de..6627c1627c8d 100644
+--- a/include/scsi/scsi_cmnd.h
++++ b/include/scsi/scsi_cmnd.h
+@@ -90,6 +90,7 @@ struct scsi_cmnd {
+ 	 * been outstanding
+ 	 */
+ 	unsigned long jiffies_at_alloc;
++	unsigned long jiffies_latency;
+ 
+ 	int retries;
+ 	int allowed;
+diff --git a/include/scsi/scsi_device.h b/include/scsi/scsi_device.h
+index 25d221759565..2841a3aa7db0 100644
+--- a/include/scsi/scsi_device.h
++++ b/include/scsi/scsi_device.h
+@@ -233,6 +233,7 @@ struct scsi_device {
+ 	struct work_struct	requeue_work;
+ #ifdef CONFIG_MACH_QNAPTS
+ 	struct work_struct	remove_work;
++	int param_latency;
+ #endif
+ 
+ 	struct scsi_device_handler *handler;

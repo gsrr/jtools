@@ -1,0 +1,921 @@
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 576ba40288b..90944aee903 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -15270,6 +15270,15 @@ int da_util_get_raid_info(int enc_id, int port_id, char *blob)
+     return 0;
+ }
+ 
++void da_generate_header(int enc_id, int port_id, char *disktype, char *fpath)
++{
++    char cmd[256] = {0};
++    sprintf(cmd, "/sbin/da_util --gen_header enc_id=%d,port_id=%d,value=%s", enc_id, port_id, disktype);
++    system(cmd);
++    sprintf(cmd, "mv /tmp/disk.head %s", fpath);
++    system(cmd);
++}
++
+ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_id, IN int port_id)
+ {
+     struct ata_smart_attribute *attribute_entry;
+@@ -15373,178 +15382,8 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+ 
+         // 2. generate header
+         snprintf(disk_data_tmpfile, sizeof(disk_data_tmpfile), DISK_DATA_PATH, enc_id, port_id);
+-        pOutput_File = fopen(disk_data_tmpfile, "w");
+-
+-        /* Here's the start of the meaningful data header. */
+-        fprintf(pOutput_File, "Header Size: %d\n", DISK_DATA_PACKAGE_HEADER_SIZE);
+-        fprintf(pOutput_File, QNAP_DRIVE_ANALYZER);
+-        fprintf(pOutput_File, "Version: %s\n", QNAP_DRIVE_ANALYZER_VERSION);
+-        fprintf(pOutput_File, "Copyright @QNAP Technology 2019\n");
+-        fprintf(pOutput_File, "Signature: Drive Health Data\n");
+-        memset(cmd, 0x0, MAX_BUF_LEN);
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("/bin/date '+%Y-%m-%d' 2>/dev/null", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "Date: %s", buf);
+-            pclose(fp);
+-        }
+-        memset(cmd, 0x0, MAX_BUF_LEN);
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("/bin/date '+%H:%M:%S' 2>/dev/null", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "Time: %s", buf);
+-            pclose(fp);
+-        }
+-        /*
+-         * Model Number:
+-         * IF enc_id = 0 THEN [NAS Model Number (eg. TVS-871T) ], else [EXPANSION Model Number (eg. REXP-1620U-RP-US)]
+-         */
+-        if (enc_id == 0)
+-        {
+-            if (!HAL_MB_Get_Display_Name(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Model Number: %s\n", buf);
+-        }
+-        else
+-        {
+-            memset(cmd, 0x0, MAX_BUF_LEN);
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"model\" -f %s", enc_id, HAL_CONF_FILE);
+-            fp = popen(cmd, "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Model Number: %s", buf);
+-                pclose(fp);
+-            }
+-        }
+-        /*
+-         * Serial Number:
+-         * IF enc_id = 0 THEN [NAS Serial Number (eg. Q18AE00945) ]  else [EXPANSION Serial Number ]
+-         */
+-        if (enc_id == 0)
+-        {
+-            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Serial Number: %s\n", buf);
+-        }
+-        else
+-        {
+-            memset(cmd, 0x0, MAX_BUF_LEN);
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
+-            fp = popen(cmd, "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Serial Number: %s", buf);
+-                pclose(fp);
+-            }
+-        }
+-        if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf, sizeof(buf)) >= 0) &&
+-            (Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Build Number", buf2, sizeof(buf2)) >= 0))
+-            fprintf(pOutput_File, "Firmware Version: %s (%s)\n", buf, buf2);
+-
+-        /*
+-         * Host ID:
+-         * IF enc_id = 0  THEN  [NAS Device Name (eg. Chen-NASF93291) ], else [Host NAS Serial Number]
+-         */
+-        if (enc_id == 0)
+-        {
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/hostname 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Host ID: %s", buf);
+-                pclose(fp);
+-            }
+-            else
+-            {
+-                if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                    fprintf(pOutput_File, "Host ID: %s\n", buf);
+-            }
+-        }
+-        else
+-        {
+-            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Host ID: %s\n", buf);
+-        }
+-
+-        fprintf(pOutput_File, "Rack Number: %d\n", enc_id);   // 1 based enclosure idenditifer
+-        fprintf(pOutput_File, "Slot Number: %d\n", port_id);
+-
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("/bin/uname -r 2>/dev/null", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "System FW: linux-%s", buf);
+-            pclose(fp);
+-        }
+-
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("/bin/uname -o 2>/dev/null", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "OS: %s", buf);
+-            pclose(fp);
+-        }
+-
+-        // TBD
+-        fprintf(pOutput_File, "Driver:\n");
+-
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("qsh NetworkService.api.get_currentGWinfo", "r");
+-        if (fp)
+-        {
+-            fgets(cmd_buf, sizeof(cmd_buf), fp);
+-            s = strstr(cmd_buf, "ip\":\"");
+-            if (s)
+-            {
+-                s += strlen("ip\":\"");
+-                p = strchr(s, '"');
+-                if (p != NULL)
+-                    *p = 0x0;
+-                //printf("======\n%s (%d)\n======\n", s, (int)strlen(s));
+-            }
+-            pclose(fp);
+-        }
+-
+-        // If fail to obtain the Host IP, use another way to retrieve the Host IP
+-        if (strlen(buf) == 0)
+-        {
+-            fp = popen("/bin/cat /etc/hosts | grep eth | cut -d ' ' -f 0", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                pclose(fp);
+-            }
+-        }
+-
+-        // If fail to obtain the Host IP, use another way to retrieve the Host IP
+-        if (strlen(buf) == 0)
+-        {
+-            fp = popen("/bin/cat /etc/hosts | grep bond | cut -d ' ' -f 0", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                pclose(fp);
+-            }
+-        }
+-        memset(hash_result, sizeof(hash_result), 0x0);
+-        if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-            fprintf(pOutput_File, "Host IP: %s\n", hash_result);
+-        else
+-            fprintf(pOutput_File, "Host IP:\n");
+-
+-        fprintf(pOutput_File, "Interface: NVMe\n");
+-        fprintf(pOutput_File, "Attribute: Regular\n");
+-
+-        disk_data_offset = DISK_DATA_PACKAGE_HEADER_SIZE;
++        da_generate_header(enc_id, port_id, "NVMe", disk_data_tmpfile);
++        pOutput_File = fopen(disk_data_tmpfile, "a");
+ 
+         count = 0;
+         for(index = 0 ; index < TEMPLATE_NVME_MAX_ITEMS ; index++)
+@@ -15555,6 +15394,7 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         }
+         fprintf(pOutput_File, "No. of Records: %d\n", count);
+ 
++        disk_data_offset = DISK_DATA_PACKAGE_HEADER_SIZE;
+         count = 1;
+         for (index = TEMPLATE_NVME_IDENTIFY_CTRL; index < TEMPLATE_NVME_MAX_ITEMS; index++) {
+             if(datainfo[index].len <= 0)
+@@ -15611,202 +15451,10 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         if (stat(PD_SMART_TMP_DIR, &statbuf) >= 0)
+         {
+             snprintf(disk_data_tmpfile, sizeof(disk_data_tmpfile), DISK_DATA_PATH, enc_id, port_id);
+-            pOutput_File = fopen(disk_data_tmpfile, "w");
++            da_generate_header(enc_id, port_id, "SATA", disk_data_tmpfile);
++            pOutput_File = fopen(disk_data_tmpfile, "a");
+ 
+             /* Here's the start of the meaningful data header. */
+-            fprintf(pOutput_File, "Header Size: %d\n", DISK_DATA_PACKAGE_HEADER_SIZE);
+-            fprintf(pOutput_File, QNAP_DRIVE_ANALYZER);
+-            fprintf(pOutput_File, "Version: %s\n", QNAP_DRIVE_ANALYZER_VERSION);
+-            fprintf(pOutput_File, "Copyright @QNAP Technology 2019\n");
+-            fprintf(pOutput_File, "Signature: Drive Health Data\n");
+-            memset(cmd, 0x0, MAX_BUF_LEN);
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/date '+%Y-%m-%d' 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Date: %s", buf);
+-                pclose(fp);
+-            }
+-            memset(cmd, 0x0, MAX_BUF_LEN);
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/date '+%H:%M:%S' 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "Time: %s", buf);
+-                pclose(fp);
+-            }
+-            /*
+-             * Model Number:
+-             * IF enc_id = 0 THEN [NAS Model Number (eg. TVS-871T) ], else [EXPANSION Model Number (eg. REXP-1620U-RP-US)]
+-             */
+-            if (enc_id == 0)
+-            {
+-                if (!HAL_MB_Get_Display_Name(buf, MAX_BUF_LEN))
+-                    fprintf(pOutput_File, "Model Number: %s\n", buf);
+-            }
+-            else
+-            {
+-                memset(cmd, 0x0, MAX_BUF_LEN);
+-                memset(buf, 0x0, MAX_BUF_LEN);
+-                snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"model\" -f %s", enc_id, HAL_CONF_FILE);
+-                fp = popen(cmd, "r");
+-                if (fp)
+-                {
+-                    fgets(buf, sizeof(buf), fp);
+-                    fprintf(pOutput_File, "Model Number: %s", buf);
+-                    pclose(fp);
+-                }
+-            }
+-            /*
+-             * Serial Number:
+-             * IF enc_id = 0 THEN [NAS Serial Number (eg. Q18AE00945) ]  else [EXPANSION Serial Number ]
+-             */
+-            if (enc_id == 0)
+-            {
+-                if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                {
+-                    memset(hash_result, sizeof(hash_result), 0x0);
+-                    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                        fprintf(pOutput_File, "Serial Number: %s\n", hash_result);
+-                    else
+-                        fprintf(pOutput_File, "Serial Number:\n");
+-                }
+-            }
+-            else
+-            {
+-                memset(cmd, 0x0, MAX_BUF_LEN);
+-                memset(buf, 0x0, MAX_BUF_LEN);
+-                snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
+-                fp = popen(cmd, "r");
+-                if (fp)
+-                {
+-                    fgets(buf, sizeof(buf), fp);
+-                    memset(hash_result, sizeof(hash_result), 0x0);
+-                    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                        fprintf(pOutput_File, "Serial Number: %s\n", hash_result);
+-                    else
+-                        fprintf(pOutput_File, "Serial Number:\n");
+-                    pclose(fp);
+-                }
+-            }
+-            if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf, sizeof(buf)) >= 0) &&
+-                (Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Build Number", buf2, sizeof(buf2)) >= 0))
+-                fprintf(pOutput_File, "Firmware Version: %s (%s)\n", buf, buf2);
+-
+-            /*
+-             * Host ID:
+-             * IF enc_id = 0  THEN  [NAS Device Name (eg. Chen-NASF93291) ], else [Host NAS Serial Number]
+-             */
+-            if (enc_id == 0)
+-            {
+-                memset(buf, 0x0, MAX_BUF_LEN);
+-                fp = popen("/bin/hostname 2>/dev/null", "r");
+-                if (fp)
+-                {
+-                    fgets(buf, sizeof(buf), fp);
+-                    memset(hash_result, sizeof(hash_result), 0x0);
+-                    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                        fprintf(pOutput_File, "Host ID: %s\n", hash_result);
+-                    else
+-                        fprintf(pOutput_File, "Host ID:\n");
+-                    pclose(fp);
+-                }
+-                else
+-                {
+-                    if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                    {
+-                        memset(hash_result, sizeof(hash_result), 0x0);
+-                        if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                            fprintf(pOutput_File, "Host ID: %s\n", hash_result);
+-                        else
+-                            fprintf(pOutput_File, "Host ID:\n");
+-                    }
+-                }
+-            }
+-            else
+-            {
+-                if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                {
+-                    memset(hash_result, sizeof(hash_result), 0x0);
+-                    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                        fprintf(pOutput_File, "Host ID: %s\n", hash_result);
+-                    else
+-                        fprintf(pOutput_File, "Host ID:\n");
+-                }
+-            }
+-
+-            fprintf(pOutput_File, "Rack Number: %d\n", enc_id);   // 1 based enclosure idenditifer
+-            fprintf(pOutput_File, "Slot Number: %d\n", port_id);
+-
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/uname -r 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "System FW: linux-%s", buf);
+-                pclose(fp);
+-            }
+-
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("/bin/uname -o 2>/dev/null", "r");
+-            if (fp)
+-            {
+-                fgets(buf, sizeof(buf), fp);
+-                fprintf(pOutput_File, "OS: %s", buf);
+-                pclose(fp);
+-            }
+-
+-            // TBD
+-            fprintf(pOutput_File, "Driver:\n");
+-
+-            memset(buf, 0x0, MAX_BUF_LEN);
+-            fp = popen("qsh NetworkService.api.get_currentGWinfo", "r");
+-            if (fp)
+-            {
+-                fgets(cmd_buf, sizeof(cmd_buf), fp);
+-                s = strstr(cmd_buf, "ip\":\"");
+-                if (s)
+-                {
+-                    s += strlen("ip\":\"");
+-                    p = strchr(s, '"');
+-                    if (p != NULL)
+-                        *p = 0x0;
+-                    //printf("======\n%s (%d)\n======\n", s, (int)strlen(s));
+-                }
+-                pclose(fp);
+-            }
+-
+-            // If fail to obtain the Host IP, use another way to retrieve the Host IP
+-            if (strlen(buf) == 0)
+-            {
+-                fp = popen("/bin/cat /etc/hosts | grep eth | cut -d ' ' -f 0", "r");
+-                if (fp)
+-                {
+-                    fgets(buf, sizeof(buf), fp);
+-                    pclose(fp);
+-                }
+-            }
+-
+-            // If fail to obtain the Host IP, use another way to retrieve the Host IP
+-            if (strlen(buf) == 0)
+-            {
+-                fp = popen("/bin/cat /etc/hosts | grep bond | cut -d ' ' -f 0", "r");
+-                if (fp)
+-                {
+-                    fgets(buf, sizeof(buf), fp);
+-                    pclose(fp);
+-                }
+-            }
+-            memset(hash_result, sizeof(hash_result), 0x0);
+-            if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-                fprintf(pOutput_File, "Host IP: %s\n", hash_result);
+-            else
+-                fprintf(pOutput_File, "Host IP:\n");
+-
+-            fprintf(pOutput_File, "Interface: SATA\n");             // For SAS drive, do we need to modify this field?
+-            fprintf(pOutput_File, "Attribute: Regular\n");
+ 
+             // Read SMART Log Directory
+             memset(&log_dir_smart, 0x0, sizeof(log_dir_smart));
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index b99180b044a..9380a61cd40 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -12,6 +12,7 @@ DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
++	python -m compileall da_util.py
+ 
+ $(DA_UTIL_OBJS): 
+ 	$(CC) -c $(INCLUDES) $(DA_UTIL_SRC) $(LIBS)
+@@ -19,6 +20,7 @@ $(DA_UTIL_OBJS):
+ install :
+ 	${CROSS_COMPILE}strip da_util
+ 	install --mode=755 da_util ${ROOT_PATH}/sbin
++	install --mode=755 da_util.pyc ${ROOT_PATH}/usr/local/bin
+ 
+ clean:
+-	rm -f *.o da_util
++	rm -f *.pyc *.o da_util
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+index 833a595cf3b..3cc814279fb 100644
+--- a/NasUtil/da_util/da_sas.c
++++ b/NasUtil/da_util/da_sas.c
+@@ -677,203 +677,287 @@ void da_gen_nas_data_file(int enc_id, int port_id, struct datainfo *dinfo, char
+     close(data_fd);
+ }
+ 
+-void da_gen_sas_header(struct datainfo *dinfo, int enc_id, int port_id, char *disk_data_tmpfile)
+-{
+-    int i, cnt, disk_data_offset;
+-    char cmd[MAX_BUF_LEN];
+-    char buf[MAX_BUF_LEN];
+-    char buf2[MAX_BUF_LEN];
+-    char hash_result[MAX_CMD_LEN];
+-    FILE *pOutput_File = NULL, *fp = NULL;
++struct headparas {
++    int enc_id;
++    int port_id;
++    char *disktype;
++};
+ 
+-    sprintf(disk_data_tmpfile, DISK_DATA_PATH, enc_id, port_id); 
+-    if(access(disk_data_tmpfile, F_OK) != -1)
+-    {
+-        unlink(disk_data_tmpfile);
+-    }
++void da_popen(char *cmd, char *buf)
++{
++    FILE *fp = NULL;
++    char buf1[MAX_BUF_LEN] = {0};
+ 
+-    pOutput_File = fopen(disk_data_tmpfile, "w");
+-    fprintf(pOutput_File, "Header Size: %d\n", DISK_SAS_DATA_PACKAGE_HEADER_SIZE);
+-    fprintf(pOutput_File, QNAP_DRIVE_ANALYZER);
+-    fprintf(pOutput_File, "Version: %s\n", QNAP_DRIVE_ANALYZER_VERSION);
+-    fprintf(pOutput_File, "Copyright @QNAP Technology 2019\n");
+-    fprintf(pOutput_File, "Signature: Drive Health Data\n");
+-    memset(cmd, 0x0, MAX_BUF_LEN);
+-    memset(buf, 0x0, MAX_BUF_LEN);
+-    fp = popen("/bin/date '+%Y-%m-%d' 2>/dev/null", "r");
++    fp = popen(cmd, "r");
+     if (fp)
+     {
+-        fgets(buf, sizeof(buf), fp);
+-        fprintf(pOutput_File, "Date: %s", buf);
++        fgets(buf1, sizeof(buf1), fp);
+         pclose(fp);
+     }
++    sprintf(buf, "%s", buf1);
++    
++}
+ 
+-    memset(cmd, 0x0, MAX_BUF_LEN);
+-    memset(buf, 0x0, MAX_BUF_LEN);
+-    fp = popen("/bin/date '+%H:%M:%S' 2>/dev/null", "r");
+-    if (fp)
+-    {
+-        fgets(buf, sizeof(buf), fp);
+-        fprintf(pOutput_File, "Time: %s", buf);
+-        pclose(fp);
+-    }
++void da_hash(char *buf)
++{
++    char hash_result[256] = {0};
++
++    if (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0)
++        sprintf(buf, "%s", hash_result);
++    
++}
++
++void headfunc_header_size(struct headparas *hp, char *buf)
++{
++    if(strcmp(hp->disktype, "SAS") == 0)
++        sprintf(buf, "%d", 2560);
++    else
++        sprintf(buf, "%d", 2048);
++
++}
++
++void headfunc_header(struct headparas *hp, char *buf)
++{
++    strcpy(buf, "QNAP Drive Analyzer");
++}
++
++void headfunc_version(struct headparas *hp, char *buf)
++{
++    strcpy(buf, "1.00\nCopyright @QNAP Technology 2019");
++}
++
++void headfunc_signature(struct headparas *hp, char *buf)
++{
++    strcpy(buf, "Drive Health Data");
++}
++
++void headfunc_date(struct headparas *hp, char *buf)
++{
++    da_popen("/bin/date '+%Y-%m-%d' 2>/dev/null", buf);
++}
++
++void headfunc_time(struct headparas *hp, char *buf)
++{
++    da_popen("/bin/date '+%H:%M:%S' 2>/dev/null", buf);
++}
++
++void headfunc_model_number(struct headparas *hp, char *buf)
++{
++    FILE *fp = NULL;
++    char cmd[MAX_BUF_LEN] = {0};
++    int enc_id = hp->enc_id;
+ 
+-    /*
+-     *              * Model Number:
+-     *                           * IF enc_id = 0 THEN [NAS Model Number (eg. TVS-871T) ], else
+-     *                           [EXPANSION Model Number (eg. REXP-1620U-RP-US)]
+-     */                                        
+     if (enc_id == 0)
+     {
+-        if (!HAL_MB_Get_Display_Name(buf, MAX_BUF_LEN))
+-            fprintf(pOutput_File, "Model Number: %s\n", buf);
++        HAL_MB_Get_Display_Name(buf, MAX_BUF_LEN);
+     }
+     else
+     {
+-        memset(cmd, 0x0, MAX_BUF_LEN);
+-        memset(buf, 0x0, MAX_BUF_LEN);
+         snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"model\" -f %s", enc_id, HAL_CONF_FILE);
+-        fp = popen(cmd, "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "Model Number: %s", buf);
+-            pclose(fp);
+-        }
++        da_popen(cmd, buf);
+     }
++}
++
++void headfunc_serial_number(struct headparas *hp, char *buf)
++{
++    FILE *fp = NULL;
++    char cmd[MAX_BUF_LEN] = {0};
++    int enc_id = hp->enc_id;
+ 
+-    /*
+-     *          * Serial Number:
+-     *                   * IF enc_id = 0 THEN [NAS Serial Number (eg. Q18AE00945) ]  else
+-     *                   [EXPANSION Serial Number ]
+-     *                            */
+     if (enc_id == 0)
+     {
+-        if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-            fprintf(pOutput_File, "Serial Number: %s\n", buf);
++        HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
+     }
+     else
+     {
+-        memset(cmd, 0x0, MAX_BUF_LEN);
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        memset(buf2, 0x0, MAX_BUF_LEN);
+         snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
+-        fp = popen(cmd, "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "Serial Number: %s", buf);
+-            pclose(fp);
+-        }
++        da_popen(cmd, buf);
+     }
+-    if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf, sizeof(buf)) >= 0) &&
++
++    if(strlen(buf) != 0)
++    {
++        da_hash(buf);
++    }
++}
++
++void headfunc_firmware_version(struct headparas *hp, char *buf)
++{
++    char buf1[MAX_BUF_LEN] = {0};
++    char buf2[MAX_BUF_LEN] = {0};
++
++    if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf1, sizeof(buf1)) >= 0) &&
+             (Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Build Number", buf2, sizeof(buf2)) >= 0))
+-        fprintf(pOutput_File, "Firmware Version: %s (%s)\n", buf, buf2);
++        sprintf(buf, "%s (%s)", buf1, buf2);
++}
++
++void headfunc_host_id(struct headparas *hp, char *buf)
++{
++    int enc_id = hp->enc_id;
++    FILE *fp = NULL;
+ 
+-    /*
+-     *          * Host ID:
+-     *                   * IF enc_id = 0  THEN  [NAS Device Name (eg. Chen-NASF93291) ], else [Host
+-     *                   NAS Serial Number]
+-     *                            */
+     if (enc_id == 0)
+     {
+-        memset(buf, 0x0, MAX_BUF_LEN);
+-        fp = popen("/bin/hostname 2>/dev/null", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            fprintf(pOutput_File, "Host ID: %s", buf);
+-            pclose(fp);
+-        }
+-        else
++        da_popen("/bin/hostname 2>/dev/null", buf);
++        if(strlen(buf) == 0)
+         {
+-            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-                fprintf(pOutput_File, "Host ID: %s\n", buf);
++            HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
+         }
+     }
+     else
+     {
+-        if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
+-            fprintf(pOutput_File, "Host ID: %s\n", buf);
++        HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
+     }
+ 
+-    fprintf(pOutput_File, "Rack Number: %d\n", enc_id);   // 1 based enclosure idenditifer
+-    fprintf(pOutput_File, "Slot Number: %d\n", port_id);
+-
+-    memset(buf, 0x0, MAX_BUF_LEN);
+-    fp = popen("/bin/uname -r 2>/dev/null", "r");
+-    if (fp)
++    if(strlen(buf) != 0)
+     {
+-        fgets(buf, sizeof(buf), fp);
+-        fprintf(pOutput_File, "System FW: linux-%s", buf);
+-        pclose(fp);
++        da_hash(buf);
+     }
++}
+ 
+-    memset(buf, 0x0, MAX_BUF_LEN);
+-    fp = popen("/bin/uname -o 2>/dev/null", "r");
+-    if (fp)
+-    {
+-        fgets(buf, sizeof(buf), fp);
+-        fprintf(pOutput_File, "OS: %s", buf);
+-        pclose(fp);
+-    }
++void headfunc_rack_number(struct headparas *hp, char *buf)
++{
++    sprintf(buf, "%d", hp->enc_id); 
++}
+ 
++void headfunc_slot_number(struct headparas *hp, char *buf)
++{
++    sprintf(buf, "%d", hp->port_id); 
++    
++}
+ 
+-    // TBD
+-    fprintf(pOutput_File, "Driver:\n");
++void headfunc_system_fw(struct headparas *hp, char *buf)
++{
++    da_popen("/bin/uname -r 2>/dev/null", buf);
++}
+ 
+-    memset(buf, 0x0, MAX_BUF_LEN);
+-    fp = popen("/bin/cat /etc/hosts | grep eth | cut -d ' ' -f 0", "r");
+-    if (fp)
++void headfunc_os(struct headparas *hp, char *buf)
++{
++    da_popen("/bin/uname -o 2>/dev/null", buf);
++}
++
++void headfunc_driver(struct headparas *hp, char *buf)
++{
++    return;
++}
++
++void headfunc_host_ip(struct headparas *hp, char *buf)
++{
++    da_popen("python /usr/local/bin/da_util.pyc get_network_ip", buf);
++    
++    if (strlen(buf) == 0)
+     {
+-        fgets(buf, sizeof(buf), fp);
+-        pclose(fp);
++        da_popen("/bin/cat /etc/hosts | grep eth | cut -d ' ' -f 0", buf);
+     }
+ 
+-    // If fail to obtain the Host IP, use another way to retrieve the Host IP
+     if (strlen(buf) == 0)
+     {
+-        fp = popen("/bin/cat /etc/hosts | grep bond | cut -d ' ' -f 0", "r");
+-        if (fp)
+-        {
+-            fgets(buf, sizeof(buf), fp);
+-            pclose(fp);
+-        }
++        da_popen("/bin/cat /etc/hosts | grep bond | cut -d ' ' -f 0", buf);
+     }
+-    
+-    // If fail to obtain the Host IP, use another way to retrieve the Host IP
+-    if (strlen(buf) == 0)
++
++    if(strlen(buf) != 0)
++    {
++        da_hash(buf);
++    }
++    return;
++}
++
++void headfunc_interface(struct headparas *hp, char *buf)
++{
++    sprintf(buf, "%s", hp->disktype);
++}
++
++void headfunc_attribute(struct headparas *hp, char *buf)
++{
++    sprintf(buf, "%s", "Regular");
++}
++
++typedef void (*headfobj) (struct headparas *hp, char *buf);
++
++struct HeadFunc {
++    char param[256];
++    headfobj func;
++};
++
++
++struct HeadFunc headfuncs[] = {
++    {"Header Size", headfunc_header_size},
++    {"Header", headfunc_header},
++    {"Version", headfunc_version},
++    {"Signature", headfunc_signature},
++    {"Date", headfunc_date},
++    {"Time", headfunc_time},
++    {"Model Number", headfunc_model_number},
++    {"Serial Number", headfunc_serial_number},
++    {"Firmware Version", headfunc_firmware_version},
++    {"Host ID", headfunc_host_id},
++    {"Rack Number", headfunc_rack_number},
++    {"Slot Number", headfunc_slot_number},
++    {"System FW", headfunc_system_fw},
++    {"OS", headfunc_os},
++    {"Driver", headfunc_driver},
++    {"Host IP", headfunc_host_ip},
++    {"Interface", headfunc_interface},
++    {"Attribute", headfunc_attribute},
++    {"", NULL},
++};
++
++void str_rstrip(char *buf)
++{
++    int i;
++    for(i = strlen(buf) - 1 ; i > -1 ; i--)
+     {
+-        char cmd_buf[2048] = {0}, *s, *p;
+-        fp = popen("qsh NetworkService.api.get_currentGWinfo", "r");
+-        if (fp)
++        if(buf[i] == '\n' || buf[i] == ' ')
+         {
+-            fgets(cmd_buf, sizeof(cmd_buf), fp);
+-            s = strstr(cmd_buf, "ip\":\"");
+-            if (s)
+-            {
+-                s += strlen("ip\":\"");
+-                //if (s)
+-                //{
+-                p = strchr(s, '"');
+-                if (p != NULL)
+-                    *p = 0x0;
+-                //printf("======\n%s(%d)\n======\n", s, (int)strlen(s));
+-                //}
+-            }
+-            pclose(fp);
++            continue;
+         }
++        break;
+     }
+-    memset(hash_result, sizeof(hash_result), 0x0);
+-    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
+-        fprintf(pOutput_File, "Host IP: %s\n", hash_result);
+-    else
+-        fprintf(pOutput_File, "Host IP:\n");
++    buf[i + 1] = '\0';
++}
+ 
+-    fprintf(pOutput_File, "Interface: SAS\n");
+-    fprintf(pOutput_File, "Attribute: Regular\n");
+-    
++int _da_gen_header(int enc_id, int port_id, char *disktype, FILE *fw)
++{
++    int i = 0;
++    struct headparas hp;
++
++    hp.enc_id = enc_id;
++    hp.port_id = port_id;
++    hp.disktype = disktype;
++
++    while(headfuncs[i].func != NULL)
++    {
++        char buf[512] = {0};
++        headfuncs[i].func(&hp, buf);
++        str_rstrip(buf);
++        fprintf(fw, "%s: %s\n", headfuncs[i].param, buf);
++        i += 1;
++    }
++}
++
++int da_gen_header(struct paras_in paras)
++{
++    FILE *fw = NULL;
++    fw = fopen("/tmp/disk.head", "w");
++    printf("enc_id = %d, port_id = %d, type=%s\n", paras.enc_id, paras.port_id, paras.value);
++    _da_gen_header(paras.enc_id, paras.port_id, paras.value, fw);
++    fclose(fw);
++}
++
++void da_gen_sas_header(struct datainfo *dinfo, int enc_id, int port_id, char *disk_data_tmpfile)
++{
++    int i, cnt, disk_data_offset;
++    FILE *pOutput_File = NULL;
+     int record_count = 0;
++
++    sprintf(disk_data_tmpfile, DISK_DATA_PATH, enc_id, port_id); 
++    if(access(disk_data_tmpfile, F_OK) != -1)
++    {
++        unlink(disk_data_tmpfile);
++    }
++
++    pOutput_File = fopen(disk_data_tmpfile, "w");
++    _da_gen_header(enc_id, port_id, "SAS", pOutput_File);
++
+     for(i = 0 ; i < SAS_FUNC_NUM + NAS_FUNC_NUM ; i++)
+     {
+         if(dinfo[i].len <= 0)
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+index 748098d0259..ada5d81fb31 100644
+--- a/NasUtil/da_util/da_util.h
++++ b/NasUtil/da_util/da_util.h
+@@ -44,6 +44,7 @@ int da_enable(struct paras_in);
+ int da_enable_by_cfg(struct paras_in);
+ int da_system_reset_cnt(struct paras_in);
+ int da_system_raid_info(struct paras_in);
++int da_gen_header(struct paras_in);
+ 
+ /*== end:function_declare_area ==*/
+ 
+@@ -61,6 +62,7 @@ static struct FuncStruct func_array[] = {
+     {"enable_by_cfg", da_enable_by_cfg},
+     {"system_reset_cnt", da_system_reset_cnt},
+     {"system_raid_info", da_system_raid_info},
++    {"gen_header", da_gen_header},
+     {"", NULL},
+ };
+ 
+diff --git a/NasUtil/da_util/da_util.py b/NasUtil/da_util/da_util.py
+new file mode 100644
+index 00000000000..05c2d9df307
+--- /dev/null
++++ b/NasUtil/da_util/da_util.py
+@@ -0,0 +1,23 @@
++import sys
++import subprocess
++
++def da_popen(cmd):
++    proc = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE)
++    return proc.stdout.read()
++
++def get_network_ip():
++    cmd = 'qsh NetworkService.api.get_currentGWinfo'
++    data = da_popen(cmd)
++    dic = eval(data)
++    try:
++        print dic['data'][0]['status']['IPv4'][0]['ip']
++    except:
++        print ""
++
++def main():
++    func = getattr(sys.modules[__name__], sys.argv[1])
++    func()
++
++
++if __name__ == "__main__":
++    main()

@@ -1,0 +1,16 @@
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+index 3cc814279fb..3f3444d4f67 100644
+--- a/NasUtil/da_util/da_sas.c
++++ b/NasUtil/da_util/da_sas.c
+@@ -772,6 +772,11 @@ void headfunc_serial_number(struct headparas *hp, char *buf)
+     {
+         snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
+         da_popen(cmd, buf);
++        if(strlen(buf) == 0)
++        {
++            printf("Can not get serial number from enclosure : %d\n", enc_id);
++            HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN);
++        }
+     }
+ 
+     if(strlen(buf) != 0)

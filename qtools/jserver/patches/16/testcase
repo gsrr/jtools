@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# case1, functionality of --ata_cnt_plus
+da_util --ata_cnt_plus value=WD-WMAYP0E2R7DK:16:1
+hexdump -C /share/CACHEDEV1_DATA/.system_disk_data/disk_data_WD-WMAYP7858047_16
+
+# case2, funcationality of hal_util
+# plug/unplug drive
+tail -f /var/log/hal_daemon.log
+
+# case3, reset cnt
+da_util --system_reset_cnt xxx
+/root/disk_data_collection.sh
+ls /share/CACHEDEV1_DATA/.system_disk_data/
+
+touch /share/CACHEDEV1_DATA/.system_disk_data/12312312
+da_util --system_reset_cnt xxx
+
+# case4, file lock
+da_util --system_reset_cnt xxx
+da_util --ata_cnt_plus value=WD-WMAYP0E2R7DK:16:1
+
+

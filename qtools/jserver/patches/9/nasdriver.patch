@@ -1,0 +1,112 @@
+diff --git a/drivers/hal/hal_netlink.c b/drivers/hal/hal_netlink.c
+index f4fc2594..d3847e7d 100755
+--- a/drivers/hal/hal_netlink.c
++++ b/drivers/hal/hal_netlink.c
+@@ -46,6 +46,7 @@ static struct proc_dir_entry *ata_time_procdir;
+ static struct proc_dir_entry *ata_retry_procdir;
+ extern int qnap_ata_reset_to_ms; // unit: ms
+ extern int qnap_ata_retry_val;
++extern int da_event_enable;
+ 
+ /* Receive messages from netlink socket. */
+ static void udp_receive(struct sk_buff  *skb)
+@@ -53,6 +54,7 @@ static void udp_receive(struct sk_buff  *skb)
+ 	NETLINK_EVT			*data;
+     struct __netlink_pd_cb *netlink_pd;
+     struct __netlink_enc_cb *netlink_enc;
++    struct __event_control *event_ctl;
+ 	struct nlmsghdr *nlh;
+ 	struct Scsi_Host *shost = NULL;
+     struct scsi_device *sdev = NULL;
+@@ -60,6 +62,17 @@ static void udp_receive(struct sk_buff  *skb)
+ 	data = NLMSG_DATA(nlh);
+     switch(data->type)
+     {
++        case HAL_EVENT_CONTROL:
++            switch(data->arg.action)
++            {
++                case DA_EVENT_ENABLE:
++                    event_ctl = &data->arg.param.event_control;
++                    da_event_enable = event_ctl->value;
++                    printk("(value, da_event_enable):(%d, %d)\n", event_ctl->value, da_event_enable);
++                    break;
++            }
++            break;
++
+         case HAL_EVENT_GENERAL_DISK:
+             netlink_pd = &data->arg.param.netlink_pd;
+             switch(data->arg.action)
+diff --git a/drivers/sas/mv-6.0.0.1009N/core/sata_base/sata_error.c b/drivers/sas/mv-6.0.0.1009N/core/sata_base/sata_error.c
+index dd5339b4..c220cf19 100644
+--- a/drivers/sas/mv-6.0.0.1009N/core/sata_base/sata_error.c
++++ b/drivers/sas/mv-6.0.0.1009N/core/sata_base/sata_error.c
+@@ -73,6 +73,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #ifdef SCSI_ID_MAP
+ #include "hba_inter.h"
+ #endif
++#if defined(CONFIG_MACH_QNAPTS)
++#include <qnap/hal_event.h>
++#endif
+ #define IS_READ_LOG_EXT_REQ(req) \
+ 	((req->Cdb[0]==SCSI_CMD_MARVELL_SPECIFIC)&& \
+ 	 (req->Cdb[1]==CDB_CORE_MODULE)&& \
+@@ -1307,6 +1310,48 @@ static MV_BOOLEAN sata_media_error_state_machine(pl_root *root,
+ 	return MV_TRUE;
+ }
+ 
++#if defined(CONFIG_MACH_QNAPTS)
++void sata_issue_halevent_error(MV_Request *req, MV_U8 status, MV_U8 err)
++{
++    MV_Request *preq;
++	struct scsi_cmnd *cmd;
++	struct scsi_device *sdev;
++	struct __netlink_pd_ata_qc_err *netlink_pd;
++    NETLINK_EVT hal_event;
++
++    preq = sat_get_org_req(req);
++    if(preq == NULL)
++    {
++        cmd = req->Org_Req_Scmd;
++    }
++    else
++    {
++        cmd = preq->Org_Req_Scmd;
++    }
++    
++    if(cmd)
++    {
++        sdev = cmd->device;
++	    CORE_EH_PRINT(("issue_halevent : [%d:%d:%d:%d]\n", sdev->host->host_no, sdev->channel, sdev->id, sdev->lun));
++
++        hal_event.type = HAL_EVENT_GENERAL_DISK;
++        hal_event.arg.action = SET_PD_ATA_QC_ERROR;
++        netlink_pd = &hal_event.arg.param.netlink_pd_ata_qc_err;
++        netlink_pd->scsi_bus[0] = sdev->host->host_no;
++        netlink_pd->scsi_bus[1] = sdev->channel;
++        netlink_pd->scsi_bus[2] = sdev->id;
++        netlink_pd->scsi_bus[3] = sdev->lun;
++        netlink_pd->state = status;
++        netlink_pd->err = err;
++        send_hal_netlink(&hal_event);
++    }
++    else
++    {
++	    CORE_EH_PRINT(("issue_halevent : scsi cmd is null\n"));
++    }
++}
++#endif
++
+ void sata_handle_taskfile_error(pl_root *root, MV_Request *req)
+ {
+ 	domain_device *dev = NULL;
+@@ -1328,6 +1373,10 @@ void sata_handle_taskfile_error(pl_root *root, MV_Request *req)
+ 		SATA_RECEIVED_D2H_FIS(root, dev->register_set));
+ 	status_reg = (MV_U8)((reg >> 16) & 0xff);
+ 	err_reg = (MV_U8)((reg >> 24) & 0xff);
++
++#if defined(CONFIG_MACH_QNAPTS)
++    sata_issue_halevent_error(req, status_reg, err_reg);
++#endif
+ 	CORE_EH_PRINT(("device %d task file error, D2H[0]=0x%x.\n", \
+ 		dev->base.id, reg));
+ 

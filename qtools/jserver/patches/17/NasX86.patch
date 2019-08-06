@@ -1,0 +1,191 @@
+diff --git a/NasUtil/sdmd/sdmd.c b/NasUtil/sdmd/sdmd.c
+index b5ce3ea6c84..9f1b469b577 100644
+--- a/NasUtil/sdmd/sdmd.c
++++ b/NasUtil/sdmd/sdmd.c
+@@ -171,8 +171,6 @@ int SDM_Health_Predict(PD_SMART_INFO *ptr, int is_spare)
+     }
+     else if (ptr->pd_type == PD_SAS)
+     {
+-        //dev-test
+-        printf("start pridict sas disk\n");
+         SDMD_TRACE(TRACE_INFO, "%s:Start to predict SAS disk\n", __func__);
+        
+         if (!PD_Is_Report_Healthy(ptr->health_status))
+@@ -427,6 +425,102 @@ int Disk_Overheat(PD_SMART_INFO *smart_infoP)
+     return 0;
+ }
+ 
++int name_start_with(char *prefix, char *name)
++{
++    int i;
++    for(i = 0 ; i < strlen(prefix) ; i++)
++    {
++        if(prefix[i] != name[i])
++        {
++            return -1;
++        }
++    }
++    return 0;
++}
++
++int estimate_ssd_life(int enc_id, int port_id)
++{
++    int ret = -1;
++    int per = -1;
++    PD_INFO pd_info;
++
++    if (PD_Get_Info(enc_id, port_id, &pd_info) < 0)
++    {       
++        SDMD_TRACE(TRACE_INFO, "%s: (enc_id, port_id) = (%d, %d) can not get pd info\n", __func__, enc_id, port_id);
++        return 0; // unknown
++    }
++
++    if(pd_info.type != PD_SATA)
++    {
++        SDMD_TRACE(TRACE_INFO, "%s: (enc_id, port_id) = (%d, %d) only support SATA\n", __func__, enc_id, port_id);
++        return 0; // Not support
++    }
++
++    if((pd_info.capabilities & PD_CAP_SSD) == 0)
++    {
++        SDMD_TRACE(TRACE_INFO, "%s: (enc_id, port_id) = (%d, %d) not support HDD \n", __func__, enc_id, port_id);
++        return 0; 
++    }
++
++    if (name_start_with("QDA-", pd_info.model) == 0)
++    {
++        SDMD_TRACE(TRACE_INFO, "%s: (enc_id, port_id) = (%s, %d, %d) not support QDA \n", __func__, pd_info.model, enc_id, port_id);
++        return 0; 
++    }
++
++    if (name_start_with("tr_", pd_info.enc_sys_id) == 0) 
++    {
++        SDMD_TRACE(TRACE_INFO, "%s: (enc_id, port_id) = (%s, %d, %d) not support TR \n", __func__, pd_info.enc_sys_id, enc_id, port_id);
++        return 0; 
++    } 
++
++    ret = PD_Get_Life_Used_Percentage(enc_id, port_id, &per);
++
++    SDMD_TRACE(TRACE_INFO, "%s: (model, enc_id, port_id, per) = (%s, %d, %d, %d)\n", __func__, pd_info.model, enc_id, port_id, 100 - per);
++    if(100 - per < 5)
++        return 1;
++    return 0; 
++}
++
++int verify_spare_disk(int *raid_ids, PD_DEV_ID dev_id, int is_spare)
++{
++    int enc_id = PD_ENC_ID(dev_id);
++    int port_id = PD_PORT_ID(dev_id);
++
++    if(is_spare == 0) // 0 --> not a spare drive, >0 --> spare drive
++    {
++        return 0;
++    }
++
++    RAID_Set_Faulty(raid_ids[0], enc_id, port_id);
++    RAID_Hot_Remove(raid_ids[0], enc_id, port_id, 1);
++    SE_Set_Buzzer(0, BUZZER_HD_ERROR);
++    return 1;
++}
++
++void mig_init_event(PD_DEV_ID dev_id, int raid_id, struct naslog_event *event, char *key)
++{
++    char disk_msg[MAX_BUFFER_SIZE] = {0};
++
++    event->type = EVENT_TYPE_WARN;
++    strcpy(event->event_ip, "");
++    strcpy(event->event_user, "");
++    strcpy(event->event_comp, "");
++    if (PD_ENC_ID(dev_id) == 0)
++    {
++        snprintf(disk_msg, sizeof(disk_msg), "%s Group %d: Drive%d", HOST_STRING, raid_id, PD_PORT_ID(dev_id));        
++    }
++    else
++    {
++        snprintf(disk_msg, sizeof(disk_msg), "%s#%d Group %d: Drive%d", JBOD_STRING, PD_ENC_ID(dev_id), raid_id, PD_PORT_ID(dev_id));
++    }
++
++    if(strcmp(key, "SSDLIFE") == 0)
++    {
++        snprintf(event->event_desc, DESC_LENGTH, "[SDM] %s SSD life percentage is less the 5%\n", disk_msg);
++    }
++}
++
+ void SDM_device(PD_DEV_ID dev_id)
+ {
+     int i;
+@@ -468,12 +562,11 @@ void SDM_device(PD_DEV_ID dev_id)
+ 
+ 
+         //check  level, and status
+-        if (!CAN_BE_HOTREPLACE(raid_info->raid_level) ||
+-                !GOOD_RAID_STATUS(raid_info->status))
++        if (!CAN_BE_HOTREPLACE(raid_info->raid_level) || !GOOD_RAID_STATUS(raid_info->status))
++        {
++            SDMD_TRACE(TRACE_ERROR, "(Raid level, Raid status) = (%d, %d)\n", __func__, raid_info->raid_level, raid_info->status);
+             goto FREE_RAID_INFO;
+-
+-        //dev-test
+-        //printf("read port_id=%d\n", dev_id);
++        }
+ 
+         //disk smart has been read
+         //get smart info for disk
+@@ -506,18 +599,15 @@ void SDM_device(PD_DEV_ID dev_id)
+         if ((smart_id = SDM_Health_Predict(smart_infoP, is_spare)) || Disk_Overheat(smart_infoP))
+         {
+             SDMD_TRACE(TRACE_WARNING, "%s:Unhealthy disk detected. port_id=%d\n", __func__, PD_PORT_ID(dev_id));
+-            printf("unhealth disk detected\n");
+ 
+             if (is_spare > 0)
+             {
+-                printf("Unhealth is spare. Set faulty and hot remove.\n");
+                 SDMD_TRACE(TRACE_INFO, "%s:Unhealth disk is spare, set faulty and hot remove.\n", __func__);
+ 
+                 RAID_Set_Faulty(raid_ids[0], PD_ENC_ID(dev_id), PD_PORT_ID(dev_id));
+                 RAID_Hot_Remove(raid_ids[0], PD_ENC_ID(dev_id), PD_PORT_ID(dev_id), 1);
+                 SE_Set_Buzzer(0, BUZZER_HD_ERROR);
+                 goto FREE_SMART_INFO;
+-
+             }
+ 
+             //prepare_spare
+@@ -581,10 +671,28 @@ void SDM_device(PD_DEV_ID dev_id)
+                 // 201305607 end by csw
+ 
+                 RAID_Hot_Replace(PD_ENC_ID(dev_id), raid_ids[0], PD_PORT_ID(dev_id));
++            }
++            goto FREE_SMART_INFO;
++        }
+ 
++        if(estimate_ssd_life(PD_ENC_ID(dev_id), PD_PORT_ID(dev_id)))
++        {
++            if(verify_spare_disk(raid_ids, dev_id, is_spare))
++            {
++                SDMD_TRACE(TRACE_INFO, "%s:(enc_id, port_id) = (%d, %d) is spare dirve.\n", __func__, PD_ENC_ID(dev_id), PD_PORT_ID(dev_id));
++                goto FREE_SMART_INFO;
+             }
+-            //end of health predict
++            
++            event = calloc(1, sizeof(struct naslog_event));
++            mig_init_event(dev_id, raid_ids[0], event, "SSDLIFE");
++            if (prepare_spare(raid_info, raid_ids[0], dev_id))
++            {
++                naslog_event_add(event);
++                RAID_Hot_Replace(PD_ENC_ID(dev_id), raid_ids[0], PD_PORT_ID(dev_id));
++            }
++            free(event);
+         }
++
+ FREE_SMART_INFO:
+         free(smart_infoP);
+ FREE_RAID_INFO:
+@@ -937,8 +1045,6 @@ int SDM(int argc, char *argv[])
+             enc_num = 0;
+ 
+             enc_num = SE_Enumerate(enc_id_ary, MAX_SE_NUM, NULL, NULL);
+-            SDMD_TRACE(TRACE_INFO, "%s: total enc = %d\n", __func__, enc_num);
+-
+ 
+             for ( i = 0; i < enc_num; i++)
+             {

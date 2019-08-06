@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+
+<manifest src="172.17.22.47/sdbpool/gitqnap" dst="172.17.22.179">
+  <project path="NasX86" name="NasX86" revision="master-20190730_ulink_filelock"/>
+</manifest>

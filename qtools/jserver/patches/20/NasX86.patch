@@ -1,0 +1,53 @@
+diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
+index 8bceb47e9a9..a6ae585c31d 100755
+--- a/NasLib/hal/hal_pd.c
++++ b/NasLib/hal/hal_pd.c
+@@ -10508,6 +10508,20 @@ int PD_Set_ATA_IO_Latency(IN PD_INFO *pd_info)
+     {
+         return -1;
+     }
++
++    if (strncmp(pd_info->model, "QDA-", 4) == 0)
++    {
++        ERR_TRACE(TRACE_WARNING, "%s: %s not support QDA \n", __func__, pd_info->model);
++        return -1; 
++    }
++
++    if (strncmp(pd_info->enc_sys_id, "tr_", 3) == 0) 
++    {
++        ERR_TRACE(TRACE_WARNING, "%s: %s not support TR \n", __func__, pd_info->enc_sys_id);
++        return -1; 
++    } 
++
++
+     for(i = 0 ; pd_info->pd_sys_name[i] != '\0' ; i++)
+     {
+         if (pd_info->pd_sys_name[i] == '/')
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 9258492851e..b5c3f185df1 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -15458,7 +15458,13 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+     if (!strncmp(enc_sys_id, ENC_TR_PREFIX_SYS_ID, strlen(ENC_TR_PREFIX_SYS_ID))) {
+         return -1;
+     } 
+-    else if(pd_info.type == PD_SAS)
++
++    if (strncmp(pd_info.model, "QDA-", 4) == 0) {
++        ERR_TRACE(TRACE_WARNING, "%s : (enc_id, port_id) = (%d, %d) QDA is not supported\n", __func__, enc_id, port_id);
++        return -1;
++    } 
++
++    if(pd_info.type == PD_SAS)
+     {
+         sprintf(cmd, "/sbin/da_util --sas enc_id=%d,port_id=%d", enc_id, port_id);
+         ERR_TRACE(TRACE_DEBUG, "pd_sys_get_data_package : %s\n", cmd);
+@@ -15803,7 +15809,7 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+ 
+             memset(datainfo, 0, sizeof(struct da_temp_info) * sata_max_template_num);
+ 
+-            sprintf(sata_tmpfile, "/tmp/sata_info_%d_Ed" ,enc_id, port_id);
++            sprintf(sata_tmpfile, "/tmp/sata_info_%d_%d" ,enc_id, port_id);
+             sata_out_file = fopen(sata_tmpfile, "w");
+             
+             for(da_i = 0 ; da_i < sata_max_template_num ; da_i++)

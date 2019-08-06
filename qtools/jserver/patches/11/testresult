@@ -1,0 +1,35 @@
+[normal situation]
+[/share/CACHEDEV1_DATA/.system_disk_data/backup] # /bin/sh /etc/init.d/disk_data_collection.sh
+enc_id = 0, port_id = 3, type=SATA
+_da_system_raid_info(90) Fail to get raid info (0, 3)
+1536+0 records in
+1536+0 records out
+1536 bytes (1.5KB) copied, 0.001348 seconds, 1.1MB/s
+upload successful!
+enc_id = 0, port_id = 5, type=SATA
+2048+0 records in
+2048+0 records out
+2048 bytes (2.0KB) copied, 0.002295 seconds, 871.5KB/s
+upload successful!
+
+[disconnect]
+[/share/CACHEDEV1_DATA/.system_disk_data/backup] # /bin/sh /etc/init.d/disk_data_collection.sh
+enc_id = 0, port_id = 3, type=SATA
+_da_system_raid_info(90) Fail to get raid info (0, 3)
+Can not get upload_url 0 3
+enc_id = 0, port_id = 5, type=SATA
+Can not get upload_url 0 5
+[/share/CACHEDEV1_DATA/.system_disk_data/backup] # ls /share/CACHEDEV1_DATA/.system_disk_data/backup/
+disk_data_pkg_0-3.bin.WD-WMAYP7858047.2019-7-29-16-24  disk_data_pkg_0-5.bin.WD-WMAYP0E2R7DK.2019-7-29-16-24
+
+[recover]
+[/share/CACHEDEV1_DATA/.system_disk_data/backup] # /bin/sh /etc/init.d/disk_data_collection.sh
+python /usr/local/bin/da_util.pyc upload_backup_disk_data /share/CACHEDEV1_DATA/.system_disk_data/backup/disk_data_pkg_0-5.bin.WD-WMAYP0E2R7DK.2019-7-29-16-24
+Can not get upload_url 0 5
+python /usr/local/bin/da_util.pyc upload_backup_disk_data /share/CACHEDEV1_DATA/.system_disk_data/backup/disk_data_pkg_0-3.bin.WD-WMAYP7858047.2019-7-29-16-24
+Can not get upload_url 0 3
+enc_id = 0, port_id = 3, type=SATA
+_da_system_raid_info(90) Fail to get raid info (0, 3)
+Can not get upload_url 0 3
+enc_id = 0, port_id = 5, type=SATA
+Can not get upload_url 0 5

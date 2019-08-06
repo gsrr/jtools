@@ -1,0 +1,33 @@
+#!/usr/bin/python
+
+import os
+import git
+
+patches_dir = '/datapool/qtools/jserver/patches/'
+
+def main():
+    repo = git.Repo.init(path='.')
+    branch_name = str(repo.head.ref)
+    if branch_name == "master":
+        return
+    if branch_name.startswith("local") == False:
+        return
+
+    patch_name = branch_name.split("-", 1)[1]
+    patch_dir = "%s/%s"%(patches_dir, patch_name)
+    if os.path.exists(patch_dir):
+        return
+
+    os.mkdir(patch_dir)
+    readme_src = "%s/README"%(patches_dir)
+    manifest_src = "%s/manifest"%(patches_dir)
+    readme_dst = "%s/README"%(patch_dir)
+    manifest_dst = "%s/manifest"%(patch_dir)
+
+    os.system("cp %s %s"%(readme_src, readme_dst))
+    os.system("cp %s %s"%(manifest_src, manifest_dst))
+    print patch_dir
+    
+
+if __name__ == "__main__":
+    main()

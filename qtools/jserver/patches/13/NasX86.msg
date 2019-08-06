@@ -1,0 +1,8 @@
+spec #20937 - ULINK template 16, 201(item 22),202(item 23)
+
+model
+    TS-ALL
+description
+    remove standard output of da_util enable command.
+related files
+    NasUtil/hal_util/hal_util_main.c

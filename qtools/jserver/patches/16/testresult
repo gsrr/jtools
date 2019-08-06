@@ -1,0 +1,46 @@
+[case1]
+[~] # da_util --ata_cnt_plus value=BTLA721307LM256CGN:16:1
+value = (BTLA721307LM256CGN, 16, 1)
+disk_sys_inc_ata_errcnt: ret = 0
+<DATA/.system_disk_data/disk_data_BTLA721307LM256CGN_16
+00000000  10 00 64 00 0f 00 00 02  00 00 00 00 00 00 00 00  |..d.............|
+00000010  01 00 01 00 02 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000020  02 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000030  03 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000040  04 00 01 00 07 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000050  05 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000060  06 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000070  07 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000080  08 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000090  09 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000a0  0a 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000b0  0b 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000c0  0c 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000d0  0d 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000e0  0e 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+000000f0  0f 00 01 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000100  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+
+[case2], hal_util mechanism
+da_ata_cnt_plus: /sbin/da_util --ata_cnt_plus value=WD-WMAYP0E2R7DK:16:4
+
+[case3] reset function
+[~] # /root/disk_data_collection.sh
+enc_id = 0, port_id = 6, type=SATA
+iotest : /sbin/da_util --iotest enc_id=0,port_id=6
+(ret = 0, /dev/sdc : WD-WMAYP0E2R7DK : /dev/sdc4 : 470810624 : 71303168)
+python /usr/local/bin/da_util.pyc fiotest "fio --name=/dev/sdc4 --iodepth=32 --rw=randread --bs=4K --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=470810624 --size=71303168"
+WD-WMAYP0E2R7DK = (randread, 304)
+python /usr/local/bin/da_util.pyc fiotest "fio --name=/dev/sdc4 --iodepth=32 --rw=randwrite --bs=4K --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=470810624 --size=71303168"
+WD-WMAYP0E2R7DK = (randwrite, 621)
+python /usr/local/bin/da_util.pyc fiotest "fio --name=/dev/sdc4 --iodepth=32 --rw=read --bs=128K --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=470810624 --size=71303168"
+WD-WMAYP0E2R7DK = (read, 73014)
+python /usr/local/bin/da_util.pyc fiotest "fio --name=/dev/sdc4 --iodepth=32 --rw=write --bs=128K --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=470810624 --size=71303168"
+
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_WD-WMAYP0E2R7DK_202, sn=WD-WMAYP0E2R7DK
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_BTLA721307LM256CGN_201, sn=BTLA721307LM256CGN
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_BTLA721307LM256CGN_16, sn=BTLA721307LM256CGN
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_BTLA721307LM256CGN_202, sn=BTLA721307LM256CGN
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_WD-WMAYP0E2R7DK_16, sn=WD-WMAYP0E2R7DKCGN
+remove file: /share/CACHEDEV1_DATA/.system_disk_data/disk_data_WD-WMAYP0E2R7DK_201, sn=WD-WMAYP0E2R7DKCGN
+

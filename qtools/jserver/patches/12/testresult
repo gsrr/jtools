@@ -1,0 +1,45 @@
+[nvme]
+Header Size: 2048
+Header: QNAP Drive Analyzer
+Version: 1.00
+Copyright @QNAP Technology 2019
+Signature: Drive Health Data
+Date: 2019-07-29
+Time: 18:19:25
+Model Number: Q13BT02298
+Serial Number: 032640d34b695d8a71d6f01aa67d8ce5b9bf671c33a8839e01cd3a2718ff1e64
+Firmware Version: 4.5.0 (20190726)
+Host ID: 032640d34b695d8a71d6f01aa67d8ce5b9bf671c33a8839e01cd3a2718ff1e64
+Rack Number: 23
+Slot Number: 1
+System FW: 4.14.24-qnap
+OS: GNU/Linux
+Driver:
+Host IP: 3506a78140c670bc5539b2e07fa366930f62cc3f1d5f342c52cf2f04acf7b00a
+Interface: NVMe
+Attribute: Regular
+No. of Records: 5
+
+
+[sas]
+Header Size: 2560
+Header: QNAP Drive Analyzer
+Version: 1.00
+Copyright @QNAP Technology 2019
+Signature: Drive Health Data
+Date: 2019-07-29
+Time: 18:21:45
+Model Number: TES-1685-SAS
+Serial Number: b44f747818bce42698653693a537f05c54c33ea92f4859041800b5f536ad4eff
+Firmware Version: 4.5.0 (20190725)
+Host ID: e4f1887bee593148b12570b6c4e465cd3b726d63751addbeb5d9302553b92c73
+Rack Number: 0
+Slot Number: 19
+System FW: 4.14.24-qnap
+OS: GNU/Linux
+Driver:
+Host IP: f1ff81a0167e5a1145b9dc5a83c59fef712fcfdc3450837b47a8f284ebf34737
+Interface: SAS
+Attribute: Regular
+No. of Records: 23
+

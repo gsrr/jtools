@@ -1,0 +1,126 @@
+diff --git a/NasLib/hal/hal_sys_enc.c b/NasLib/hal/hal_sys_enc.c
+index c80d44ddc6c..f5cab80510f 100755
+--- a/NasLib/hal/hal_sys_enc.c
++++ b/NasLib/hal/hal_sys_enc.c
+@@ -13747,8 +13747,6 @@ int se_sys_set_disk_data_collection(IN int enable)
+         {
+             snprintf(cmd, sizeof(cmd), "echo \"$(($RANDOM % 60)) 3 * * * /bin/sh %s\" >> /etc/config/crontab", NAS_DISK_DATA_COLLECTION_SCRIPT);
+             system(cmd);
+-            snprintf(cmd, sizeof(cmd), "echo \"* 2 * * * /bin/sh %s\" >> /etc/config/crontab", NAS_DISK_DATA_IOTEST_SCRIPT);
+-            system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=1");
+@@ -13758,8 +13756,6 @@ int se_sys_set_disk_data_collection(IN int enable)
+         {
+             snprintf(cmd, sizeof(cmd), "/bin/sed -i '/disk_data_collection/d' /etc/config/crontab");
+             system(cmd);
+-            snprintf(cmd, sizeof(cmd), "/bin/sed -i '/da_iotest/d' /etc/config/crontab");
+-            system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
+             snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=0");
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 360c2afb43e..fc1eaa2b971 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -15412,6 +15412,14 @@ void da_generate_header(int enc_id, int port_id, char *disktype, char *fpath)
+     system(cmd);
+ }
+ 
++void da_iotest(int enc_id, int port_id)
++{
++    char cmd[128] = {0};
++    sprintf(cmd, "/sbin/da_util --iotest enc_id=%d,port_id=%d", enc_id, port_id);
++    printf("iotest : %s\n", cmd);
++    system(cmd);
++}
++
+ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_id, IN int port_id)
+ {
+     struct ata_smart_attribute *attribute_entry;
+@@ -15821,7 +15829,7 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+                 else if(da_i == 1)
+                 {
+                     memset(blob, 0x0, sizeof(blob));
+-                    
++                    da_iotest(enc_id, port_id);
+                     ret = pd_sys_get_disk_statistic_data(201, pd_info.serial_no, blob);
+                     if(ret == 0)
+                     {
+diff --git a/NasUtil/da_util/da_iotest.c b/NasUtil/da_util/da_iotest.c
+index ea48514ff30..ec6dba4b3f0 100644
+--- a/NasUtil/da_util/da_iotest.c
++++ b/NasUtil/da_util/da_iotest.c
+@@ -52,7 +52,7 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+     int i;
+     for(i = 0 ; i < 4 ; i++)
+     {
+-        sprintf(cmd, "fio --name=%s --iodepth=32 --rw=%s --bs=%dK --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=%llu --size=%llu", 
++        sprintf(cmd, "python /usr/local/bin/da_util.pyc fiotest \"fio --name=%s --iodepth=32 --rw=%s --bs=%dK --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=%llu --size=%llu\"", 
+             devname, params[i].ioname, params[i].bw, begin, length);
+         printf("%s\n", cmd);
+         ret = fio_popen(cmd, buf);
+@@ -76,6 +76,7 @@ Example:
+ */
+ int da_iotest(struct paras_in paras)
+ {
++    int ret;
+     PD_INFO pd_info;
+     char devname[256] = {0};
+     unsigned long long begin;
+@@ -86,8 +87,9 @@ int da_iotest(struct paras_in paras)
+         return -1;
+     }
+ 
+-    NAS_Disk_Get_Test_Range(paras.enc_id, paras.port_id, devname, 256, &begin, &length); 
+-    printf("(%s : %s : %s : %d : %d)\n", pd_info.pd_sys_name, pd_info.serial_no, devname, begin, length); 
+-    fio_iotest(pd_info.serial_no, devname, begin, length);
++    ret = NAS_Disk_Get_Test_Range(paras.enc_id, paras.port_id, devname, 256, &begin, &length); 
++    printf("(ret = %d, %s : %s : %s : %d : %d)\n", ret, pd_info.pd_sys_name, pd_info.serial_no, devname, begin, length); 
++    if(ret == 0)
++        fio_iotest(pd_info.serial_no, devname, begin, length);
+     return 0;
+ }
+diff --git a/NasUtil/da_util/da_util.py b/NasUtil/da_util/da_util.py
+index 63c541f8eae..8a788ea76ba 100644
+--- a/NasUtil/da_util/da_util.py
++++ b/NasUtil/da_util/da_util.py
+@@ -2,9 +2,15 @@ import sys
+ import subprocess
+ import os
+ import re
++import time
+ 
+-def da_popen(cmd):
++def da_popen(cmd, timeout = 0):
+     proc = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE)
++    if timeout > 0:
++        cnt = 1
++        while cnt < timeout and proc.poll() == None:
++            cnt += 1
++            time.sleep(1)
+     return proc.stdout.read()
+ 
+ def get_network_ip():
+@@ -63,6 +69,7 @@ def upload_disk_data():
+ 
+ def upload_backup_disk_data():
+     path = sys.argv[2]
++
+     enc_id, port_id = parse_id_from_path(path)
+     ret = do_upload(enc_id, port_id, path)
+     
+@@ -72,6 +79,12 @@ def upload_backup_disk_data():
+         os.remove(path)
+         os._exit(0)
+ 
++def fiotest():
++    cmd = sys.argv[2]
++    data = da_popen(cmd, 15)
++    print data
++
++
+ def main():
+     func = getattr(sys.modules[__name__], sys.argv[1])
+     func()

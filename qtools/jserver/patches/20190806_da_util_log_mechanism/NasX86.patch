@@ -1,0 +1,125 @@
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+index 82d1ef660e0..e4089994785 100644
+--- a/NasUtil/da_util/Makefile
++++ b/NasUtil/da_util/Makefile
+@@ -7,8 +7,8 @@ LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib
+ CC = ${CROSS_COMPILE}gcc
+ CFLAGS = -Wall -O2
+ 
+-DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c da_backup.c da_sata.c da_lib.c
+-DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o da_backup.o da_sata.o da_lib.o
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c da_backup.c da_sata.c da_lib.c da_log.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o da_backup.o da_sata.o da_lib.o da_log.o
+ 
+ all: $(DA_UTIL_OBJS)
+ 	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
+diff --git a/NasUtil/da_util/da_func.c b/NasUtil/da_util/da_func.c
+index 0cf19a42bea..056e2348afd 100644
+--- a/NasUtil/da_util/da_func.c
++++ b/NasUtil/da_util/da_func.c
+@@ -2,6 +2,7 @@
+ #include <sys/socket.h> 
+ 
+ #include "da_util.h"
++#include "da_log.h"
+ 
+ void EVT_Send_To_Kernel(int sock_fd, NETLINK_EVT *event)
+ {
+@@ -51,7 +52,7 @@ int da_enable(struct paras_in paras)
+     NETLINK_EVT event;
+ 
+     value = atoi(paras.value);
+-    printf("da_enable : value = %d\n", value);
++    da_debug_log(TRACE_INFO, "da_enable : value = %d\n", value);
+     event.type = HAL_EVENT_CONTROL;
+     event.arg.action = DA_EVENT_ENABLE;
+     event.arg.param.event_control.value = value;
+diff --git a/NasUtil/da_util/da_log.c b/NasUtil/da_util/da_log.c
+new file mode 100644
+index 00000000000..5343f6d8f77
+--- /dev/null
++++ b/NasUtil/da_util/da_log.c
+@@ -0,0 +1,70 @@
++#include <stdio.h>
++#include <stdarg.h>
++#include <time.h>
++#include <sys/file.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <string.h>
++
++#include "da_log.h"
++
++void get_time(char *time_str)
++{
++    time_t time_val;
++
++	time(&time_val);
++	sprintf(time_str, "%s",strtok(ctime(&time_val), "\n"));
++}
++
++int get_fd(char *log_file)
++{
++	int fd = -1;
++	if ((fd = open(log_file, O_RDWR | O_CREAT | O_APPEND, S_IRWXU)) < 0)
++	{
++		return -1;
++	}
++	if (flock(fd, LOCK_EX) < 0)
++	{
++		close(fd);
++		return -1;
++	}
++	return fd;	
++}
++
++int da_debug_log(int flags, const char* format, ...)
++{
++	char *fpath = "/var/log/da_util.log";
++    va_list argptr;
++    int fd = 1;
++    int ret = 0;
++    char buffer[1024];
++	char time_str[128] = {0};
++	struct stat st;
++	
++	get_time(time_str);
++	
++	fd = get_fd(fpath);
++	if(fd == -1)
++	{
++		return -1;
++	}
++	
++	sprintf(buffer, "[%s] ", time_str);
++	va_start(argptr, format);
++	vsprintf(buffer + strlen(buffer), format, argptr);
++	ret = write(fd, buffer, strlen(buffer));
++	va_end(argptr);
++
++	
++	stat(fpath, &st);
++	if(st.st_size > MAX_LOG_FILE_SIZE)
++	{
++		unlink(fpath);	
++	}
++	flock(fd, LOCK_UN);
++	close(fd);
++    return ret;
++
++}
+diff --git a/NasUtil/da_util/da_log.h b/NasUtil/da_util/da_log.h
+new file mode 100644
+index 00000000000..4aaafc0b3a5
+--- /dev/null
++++ b/NasUtil/da_util/da_log.h
+@@ -0,0 +1,7 @@
++
++#define MAX_LOG_FILE_SIZE (1024 * 512)
++
++#define TRACE_ERROR		0x0001
++#define TRACE_WARNING	0x0002
++#define TRACE_INFO		0x0004
++

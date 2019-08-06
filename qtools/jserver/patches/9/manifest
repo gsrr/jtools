@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+
+<manifest src="172.17.22.47/sdbpool/gitqnap" dst="172.17.22.179">
+  <project path="NasX86" name="NasX86" revision="QTS_4.4.x"/>
+  <project path="NasX86/Kernel/linux-4.14" name="linux" revision="QTS-4.4.x-Kernel-4.14"/>
+  <project path="NasX86/Driver-linux-4.14" name="nasdriver" revision="QTS-4.4.x-Kernel-4.14"/>
+</manifest>

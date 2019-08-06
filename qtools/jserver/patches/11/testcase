@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# case1 (make sure upload backup file work normally)
+da_util --backup_file enc_id=0,port_id=3,value=/tmp/smart/disk_data_pkg_0-3.bin
+da_util --upload_backup_file xxxx
+
+# case2 ()
+1. unplug network
+2. /bin/sh /etc/init.d/disk_data_collection.sh
+3. ls /share/CACHEDEV1_DATA/.system_disk_data/backup/
+
+# case3 (error handle for da_util --upload_backup_file xxx)
+1. cd /share/CACHEDEV1_DATA/.system_disk_data/backup
+2. touch test.adfsdf.cdcdcd.342
+3. touch 1232432423
+4. touch __0-3.3434
+5. da_util --upload_backup_file xxxx
+=> make sure that there is no seagmentation fault.
+
+# case4 
+1. /bin/sh /etc/init.d/disk_data_collection.sh
+--> upload normally
+
+# case5
+1. unplug network
+2. /bin/sh /etc/init.d/disk_data_collection.sh
+3. ls /share/CACHEDEV1_DATA/.system_disk_data/backup/
+4. recover network
+5. /bin/sh /etc/init.d/disk_data_collection.sh
+--> all files will be uploaded.

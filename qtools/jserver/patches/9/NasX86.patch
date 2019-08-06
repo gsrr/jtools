@@ -1,0 +1,3785 @@
+diff --git a/NasLib/hal/hal.h b/NasLib/hal/hal.h
+index e2dc5322a54..87807dac380 100755
+--- a/NasLib/hal/hal.h
++++ b/NasLib/hal/hal.h
+@@ -193,8 +193,10 @@ extern "C" {
+ 
+ // For disk data collection
+ #define NAS_DISK_DATA_COLLECTION_SCRIPT "/etc/init.d/disk_data_collection.sh"
++#define NAS_DISK_DATA_IOTEST_SCRIPT 	"/etc/init.d/da_iotest.sh"
+ #define NAS_CONF_DISK_DATA_SECTION      "Disk Data Collection"
+ #define NAS_CONF_DISK_DATA_ENABLED      "Enabled"
++#define NAS_DISK_DATA_LOCATION	        "/share/CACHEDEV1_DATA/.system_disk_data"
+ 
+ #define NAS_CONF_FILE                   "/etc/config/uLinux.conf"
+ 
+@@ -357,6 +359,130 @@ extern "C" {
+ // Debug Control File List
+ #define DBG_SKIP_PD_HOT_ADD_REMOVE          "/tmp/dbg_skip_pd_hot_add_remove"
+ 
++enum {
++    /* bits in ATA command block registers */
++    ATA_DRDY        = (1 << 6), /* device ready */
++    ATA_ICRC        = (1 << 7), /* interface CRC error */
++    ATA_UNC         = (1 << 6), /* uncorrectable media error */
++    ATA_IDNF        = (1 << 4), /* ID not found */
++    ATA_ABORTED     = (1 << 2), /* command aborted */
++    ATA_AMNF        = (1 << 0), /* address mark not found */
++
++    /* ATA device commands */
++    ATA_CMD_DEV_RESET	= 0x08, /* ATAPI device reset */
++    ATA_CMD_CHK_POWER	= 0xE5, /* check power mode */
++    ATA_CMD_STANDBY		= 0xE2, /* place in standby power mode */
++    ATA_CMD_IDLE		= 0xE3, /* place in idle power mode */
++    ATA_CMD_EDD		= 0x90,	/* execute device diagnostic */
++    ATA_CMD_DOWNLOAD_MICRO  = 0x92,
++    ATA_CMD_DOWNLOAD_MICRO_DMA = 0x93,
++    ATA_CMD_NOP		= 0x00,
++    ATA_CMD_FLUSH		= 0xE7,
++    ATA_CMD_FLUSH_EXT	= 0xEA,
++    ATA_CMD_ID_ATA		= 0xEC,
++    ATA_CMD_ID_ATAPI	= 0xA1,
++    ATA_CMD_SERVICE		= 0xA2,
++    ATA_CMD_READ		= 0xC8,
++    ATA_CMD_READ_EXT	= 0x25,
++    ATA_CMD_READ_QUEUED	= 0x26,
++    ATA_CMD_READ_STREAM_EXT	= 0x2B,
++    ATA_CMD_READ_STREAM_DMA_EXT = 0x2A,
++    ATA_CMD_WRITE		= 0xCA,
++    ATA_CMD_WRITE_EXT	= 0x35,
++    ATA_CMD_WRITE_QUEUED	= 0x36,
++    ATA_CMD_WRITE_STREAM_EXT = 0x3B,
++    ATA_CMD_WRITE_STREAM_DMA_EXT = 0x3A,
++    ATA_CMD_WRITE_FUA_EXT	= 0x3D,
++    ATA_CMD_WRITE_QUEUED_FUA_EXT = 0x3E,
++    ATA_CMD_FPDMA_READ	= 0x60,
++    ATA_CMD_FPDMA_WRITE	= 0x61,
++    ATA_CMD_NCQ_NON_DATA	= 0x63,
++    ATA_CMD_FPDMA_SEND	= 0x64,
++    ATA_CMD_FPDMA_RECV	= 0x65,
++    ATA_CMD_PIO_READ	= 0x20,
++    ATA_CMD_PIO_READ_EXT	= 0x24,
++    ATA_CMD_PIO_WRITE	= 0x30,
++    ATA_CMD_PIO_WRITE_EXT	= 0x34,
++    ATA_CMD_READ_MULTI	= 0xC4,
++    ATA_CMD_READ_MULTI_EXT	= 0x29,
++    ATA_CMD_WRITE_MULTI	= 0xC5,
++    ATA_CMD_WRITE_MULTI_EXT	= 0x39,
++    ATA_CMD_WRITE_MULTI_FUA_EXT = 0xCE,
++    ATA_CMD_SET_FEATURES	= 0xEF,
++    ATA_CMD_SET_MULTI	= 0xC6,
++    ATA_CMD_PACKET		= 0xA0,
++    ATA_CMD_VERIFY		= 0x40,
++    ATA_CMD_VERIFY_EXT	= 0x42,
++    ATA_CMD_WRITE_UNCORR_EXT = 0x45,
++    ATA_CMD_STANDBYNOW1	= 0xE0,
++    ATA_CMD_IDLEIMMEDIATE	= 0xE1,
++    ATA_CMD_SLEEP		= 0xE6,
++    ATA_CMD_INIT_DEV_PARAMS	= 0x91,
++    ATA_CMD_READ_NATIVE_MAX	= 0xF8,
++    ATA_CMD_READ_NATIVE_MAX_EXT = 0x27,
++    ATA_CMD_SET_MAX		= 0xF9,
++    ATA_CMD_SET_MAX_EXT	= 0x37,
++    ATA_CMD_READ_LOG_EXT	= 0x2F,
++    ATA_CMD_WRITE_LOG_EXT	= 0x3F,
++    ATA_CMD_READ_LOG_DMA_EXT = 0x47,
++    ATA_CMD_WRITE_LOG_DMA_EXT = 0x57,
++    ATA_CMD_TRUSTED_NONDATA	= 0x5B,
++    ATA_CMD_TRUSTED_RCV	= 0x5C,
++    ATA_CMD_TRUSTED_RCV_DMA = 0x5D,
++    ATA_CMD_TRUSTED_SND	= 0x5E,
++    ATA_CMD_TRUSTED_SND_DMA = 0x5F,
++    ATA_CMD_PMP_READ	= 0xE4,
++    ATA_CMD_PMP_READ_DMA	= 0xE9,
++    ATA_CMD_PMP_WRITE	= 0xE8,
++    ATA_CMD_PMP_WRITE_DMA	= 0xEB,
++    ATA_CMD_CONF_OVERLAY	= 0xB1,
++    ATA_CMD_SEC_SET_PASS	= 0xF1,
++    ATA_CMD_SEC_UNLOCK	= 0xF2,
++    ATA_CMD_SEC_ERASE_PREP	= 0xF3,
++    ATA_CMD_SEC_ERASE_UNIT	= 0xF4,
++    ATA_CMD_SEC_FREEZE_LOCK	= 0xF5,
++    ATA_CMD_SEC_DISABLE_PASS = 0xF6,
++    ATA_CMD_CONFIG_STREAM	= 0x51,
++    ATA_CMD_SMART		= 0xB0,
++    ATA_CMD_MEDIA_LOCK	= 0xDE,
++    ATA_CMD_MEDIA_UNLOCK	= 0xDF,
++    ATA_CMD_DSM		= 0x06,
++    ATA_CMD_CHK_MED_CRD_TYP = 0xD1,
++    ATA_CMD_CFA_REQ_EXT_ERR = 0x03,
++    ATA_CMD_CFA_WRITE_NE	= 0x38,
++    ATA_CMD_CFA_TRANS_SECT	= 0x87,
++    ATA_CMD_CFA_ERASE	= 0xC0,
++    ATA_CMD_CFA_WRITE_MULT_NE = 0xCD,
++    ATA_CMD_REQ_SENSE_DATA  = 0x0B,
++    ATA_CMD_SANITIZE_DEVICE = 0xB4,
++    ATA_CMD_ZAC_MGMT_IN	= 0x4A,
++    ATA_CMD_ZAC_MGMT_OUT	= 0x9F,
++
++    /* READ/WRITE LONG (obsolete) */
++    ATA_CMD_READ_LONG	= 0x22,
++    ATA_CMD_READ_LONG_ONCE	= 0x23,
++    ATA_CMD_WRITE_LONG	= 0x32,
++    ATA_CMD_WRITE_LONG_ONCE	= 0x33,
++
++    /* SError bits */
++    SERR_DATA_RECOVERED = (1 << 0), /* recovered data error */
++    SERR_COMM_RECOVERED = (1 << 1), /* recovered comm failure */
++    SERR_DATA       = (1 << 8), /* unrecovered data error */
++    SERR_PERSISTENT     = (1 << 9), /* persistent data/comm error */
++    SERR_PROTOCOL       = (1 << 10), /* protocol violation */
++    SERR_INTERNAL       = (1 << 11), /* host internal error */
++    SERR_PHYRDY_CHG     = (1 << 16), /* PHY RDY changed */
++    SERR_PHY_INT_ERR    = (1 << 17), /* PHY internal error */
++    SERR_COMM_WAKE      = (1 << 18), /* Comm wake */
++    SERR_10B_8B_ERR     = (1 << 19), /* 10b to 8b decode error */
++    SERR_DISPARITY      = (1 << 20), /* Disparity */
++    SERR_CRC        = (1 << 21), /* CRC error */
++    SERR_HANDSHAKE      = (1 << 22), /* Handshake error */
++    SERR_LINK_SEQ_ERR   = (1 << 23), /* Link sequence error */
++    SERR_TRANS_ST_ERROR = (1 << 24), /* Transport state trans. error */
++    SERR_UNRECOG_FIS    = (1 << 25), /* Unrecognized FIS */
++    SERR_DEV_XCHG       = (1 << 26), /* device exchanged */
++};
+ /**
+  * @defgroup HAL_UPPER_LAYER HAL Upper Layer
+  */
+@@ -3154,7 +3280,8 @@ typedef enum _NVME_DATA_TEMPLATE
+     TEMPLATE_NVME_SMART_LOG                                 = 2,
+     TEMPLATE_NVME_ERR_LOG                                   = 3,
+     TEMPLATE_NVME_SELF_TEST                                 = 4,
+-    TEMPLATE_NVME_MAX_ITEMS                                 = 5,
++    TEMPLATE_RAID_INFO                                      = 5,
++    TEMPLATE_NVME_MAX_ITEMS                                 = 6,
+ } NVME_DATA_TEMPLATE;
+ 
+ 
+@@ -10229,6 +10356,58 @@ int FC_Get_Port_Info(IN int hba_id, IN int port_id, OUT FC_PORT_INFO *fcport_inf
+ int FC_Get_HBA_Info(IN int hba_id, OUT FC_HBA_INFO *fchba_infoP);
+ 
+ 
++/**
++ * @fn int PD_Inc_ATA_ErrCnt(char *sn, int tnum, int id)
++ * @brief Increase ATA Error count. 
++ *
++ * This function is called by nas utility to increase the error count for drive.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is increased sucessful.
++ * @retval -1 Generic failure, Fail to increase the value.
++ */
++int PD_Inc_ATA_ErrCnt(char *sn, int tnum, int id);
++
++/**
++ * @fn int PD_Set_ATA_IOTest_Val(char *sn, int tnum, int id)
++ * @brief Set IOTest Value for ATA drive.
++ *
++ * This function is called by nas utility to set the value of iotest result.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is set successful.
++ * @retval -1 Generic failure, Fail to set the value.
++ */
++int PD_Set_ATA_IOTest_Val(char *sn, int tnum, int id, int val);
++
++/**
++ * @fn int PD_Set_ATA_IO_Latency(PD_INFO *pd_info)
++ * @brief Set io latency for ata disk.
++ *
++ * This function is called by nas utility to set the value for io latency.
++ * @param[in] *pd_info is the physical disk info.
++ * @retval 0 Success, the value is set successful.
++ * @retval -1 Generic failure, Fail to set the value.
++ */
++int PD_Set_ATA_IO_Latency(PD_INFO *pd_info);
++
++/**
++ * @fn int PD_Get_Disk_Statistic_Data(IN int enc_id, IN int port_id, IN int tnum, OUT char *buf)
++ * @brief Get the disk statistic data by enc_id, port_id and template number.
++ *
++ * This function will get the disk statistic data by enc_id, port_id and template number.
++ *
++ * @param[in] enc_id Enclosure id
++ * @param[in] port_id Disk Port id
++ * @param[in] tnum TEMPLATE NUMBER
++ * @param[out] *buf Buffer for the disk statistic data.
++ *
++ * @retval 0 Success.
++ * @retval -1 Generic failure.
++ */
++int PD_Get_Disk_Statistic_Data(IN int enc_id, IN int port_id, IN int tnum, OUT char *buf);
+ /*@}*/  /* end of upper layer module */
+ 
+ /**
+diff --git a/NasLib/hal/hal_app.c b/NasLib/hal/hal_app.c
+index ae53e122704..c86e6baf86d 100755
+--- a/NasLib/hal/hal_app.c
++++ b/NasLib/hal/hal_app.c
+@@ -450,6 +450,10 @@ int disk_sys_get_nvme_smart(char* arg);
+ int disk_sys_set_nvme_self_test(char* arg);
+ int disk_sys_get_negotiation_link_rate(char* arg);
+ int disk_sys_get_tr_port_status(char* arg);
++int disk_sys_inc_ata_errcnt(char* arg);
++int disk_sys_ata_set_val(char* arg);
++int disk_sys_set_ata_io_latency(char* arg);
++int disk_sys_get_disk_statistic_data(char* arg);
+ int network_sys_scan(char* arg);
+ int network_sys_get_speed(char* arg);
+ int network_sys_is_MAC_locked(char* arg);
+@@ -795,6 +799,10 @@ static hal_func s_hal_func_ary[] = {
+     disk_sys_set_nvme_self_test,
+     disk_sys_get_negotiation_link_rate,
+     disk_sys_get_tr_port_status,
++    disk_sys_inc_ata_errcnt,
++    disk_sys_ata_set_val,
++    disk_sys_set_ata_io_latency,
++    disk_sys_get_disk_statistic_data,
+     network_sys_scan,
+     network_sys_get_speed,
+     network_sys_is_MAC_locked,
+@@ -1150,6 +1158,10 @@ static struct option s_hal_test_cmd_opts_long[] = {
+     {"pd_sys_set_nvme_self_test", required_argument, NULL, 0},
+     {"pd_sys_get_negotiation_link_rate", required_argument, NULL, 0},
+     {"pd_sys_get_tr_port_status", required_argument, NULL, 0},
++    {"pd_inc_ata_errcnt", required_argument, NULL, 0},
++    {"pd_set_ata_iotest_val", required_argument, NULL, 0},
++    {"pd_set_ata_io_latency", required_argument, NULL, 0},
++    {"pd_get_disk_statistic_data", required_argument, NULL, 0},
+     {"net_sys_scan", required_argument, NULL, 0},
+     {"net_sys_get_speed", required_argument, NULL, 0},
+     {"net_sys_is_MAC_locked", required_argument, NULL, 0},
+@@ -1719,6 +1731,14 @@ HAL SYS unit test utility.\n\
+                                     Get the pd negotiation link speed of a specified disk\n\
+   --pd_sys_get_tr_port_status enc_id=XXX,port_id=YYY \n\
+                                     Retrieve port status for a specified disk in a specified TR enclosure\n\
++  --pd_inc_ata_errcnt value=sn:tnum:cid \n\
++                                    increae error count for sata drive\n\
++  --pd_set_ata_iotest_val value=sn:tnum:cid:val \n\
++                                    set IOPS or MBPS value of iotest result\n\
++  --pd_set_ata_io_latency enc_id=XXX, port_id=YYY \n\
++                                    set io latency for ata disk\n\
++  --pd_get_disk_statistic_data enc_id=XXX, port_id=YYY value=tnum\n\
++                                    get disk statistic data\n\
+   --net_sys_scan mode=XXX           Enumerate network, mode=0-->legacy_swap, mode=1->enhance, mode=2->legacy_mapped,mode=-1-->check model.conf\n\
+   --net_sys_get_speed obj_index=XXX Get negotiated speed for network port\n\
+   --net_sys_is_MAC_locked obj_index=XXX Check NIC MAC is locked or not.\n\
+@@ -9251,6 +9271,112 @@ int disk_sys_get_tr_port_status(char* arg)
+     return ret;
+ }
+ 
++int disk_sys_inc_ata_errcnt(char* arg)
++{
++	unsigned int index_bmp;
++	char *param = NULL;
++	char sn[512] = {0};
++	int tnum, id;
++    int ret;
++	if (arg)
++	{
++		index_bmp = parse_cmd_parms(hal_test_param_ary, arg);
++		if (UINT_TEST_BIT(index_bmp, PARAM_VALUE))
++		{
++			param = hal_test_param_ary[PARAM_VALUE].param_value;
++		}
++	}
++	if(param == NULL)
++	{
++		return -1;
++	}
++	sscanf(param, "%[^:]:%d:%d", sn, &tnum, &id); 
++	ret = PD_Inc_ATA_ErrCnt(sn, tnum, id);
++    printf("disk_sys_inc_ata_errcnt: ret = %d\n", ret);
++	return 0;
++}
++
++int disk_sys_ata_set_val(char* arg)
++{
++	unsigned int index_bmp;
++	char *param = NULL;
++	char sn[512] = {0};
++	int tnum, id, val;
++
++	if (arg)
++	{
++		index_bmp = parse_cmd_parms(hal_test_param_ary, arg);
++		if (UINT_TEST_BIT(index_bmp, PARAM_VALUE))
++		{
++			param = hal_test_param_ary[PARAM_VALUE].param_value;
++		}
++	}
++	if(param == NULL)
++	{
++		return -1;
++	}
++	sscanf(param, "%[^:]:%d:%d:%d", sn, &tnum, &id, &val); 
++	PD_Set_ATA_IOTest_Val(sn, tnum, id, val);
++	return 0;
++}
++
++int disk_sys_set_ata_io_latency(char* arg)
++{
++	unsigned int index_bmp;
++    PD_INFO pd_info;
++    int enc_id = -1;
++    int port_id = -1;
++
++	if (arg)
++    {
++        index_bmp = parse_cmd_parms(hal_test_param_ary, arg);
++        if (UINT_TEST_BIT(index_bmp, PARAM_ENC_ID) && UINT_TEST_BIT(index_bmp, PARAM_PORT_ID))
++        {
++            enc_id = atoi(hal_test_param_ary[PARAM_ENC_ID].param_value);
++            port_id = atoi(hal_test_param_ary[PARAM_PORT_ID].param_value);
++        }
++    }
++    memset(&pd_info, 0, sizeof(pd_info));
++    printf("set io latency : %d, %d\n", enc_id, port_id);
++    if (PD_Get_Info(enc_id, port_id, &pd_info) >= 0)
++    {
++        PD_Set_ATA_IO_Latency(&pd_info);
++    }
++    return -1;
++}
++
++int disk_sys_get_disk_statistic_data(char* arg)
++{
++	unsigned int index_bmp;
++    int enc_id = -1;
++    int port_id = -1;
++    int tnum = -1;
++    char buf[512];
++    int i;
++
++	if (arg)
++    {
++        index_bmp = parse_cmd_parms(hal_test_param_ary, arg);
++        if (UINT_TEST_BIT(index_bmp, PARAM_ENC_ID) && UINT_TEST_BIT(index_bmp, PARAM_PORT_ID))
++        {
++            enc_id = atoi(hal_test_param_ary[PARAM_ENC_ID].param_value);
++            port_id = atoi(hal_test_param_ary[PARAM_PORT_ID].param_value);
++        }
++		if (UINT_TEST_BIT(index_bmp, PARAM_VALUE))
++		{
++			tnum = atoi(hal_test_param_ary[PARAM_VALUE].param_value);
++		}
++    }
++    printf("get disk statistic data : %d, %d, %d\n", enc_id, port_id, tnum);
++    
++    PD_Get_Disk_Statistic_Data(enc_id, port_id, tnum, buf);
++    for(i = 0 ; i < 512 ; i++)
++    {
++        printf("%x ", buf[i] & 0xff);
++    }
++    printf("\n");
++}
++
+ int network_sys_scan(char* arg)
+ {
+     int ret = -EINVAL;
+diff --git a/NasLib/hal/hal_common.h b/NasLib/hal/hal_common.h
+index 0ca1bf49ea8..e4aa346de4f 100755
+--- a/NasLib/hal/hal_common.h
++++ b/NasLib/hal/hal_common.h
+@@ -74,6 +74,29 @@ typedef enum _PD_SR_MODE{
+  ************************************************************************/
+ #define TR_PD_OFFSET                        100
+ 
++#define ULINK_TEMPLATE_SIZE 512
++#define ULINK_TEMPLATE_RESERVE_BYTES 8
++#define ULINK_CELL_SIZE 16
++
++typedef struct _ULINK_CELL 
++{
++    unsigned short int id;
++    unsigned short int flag; /* 0: accumulated value, 1: new val */
++    unsigned int val;
++    char res[8];  /* reserved bytes */
++}ULINK_CELL;
++
++/* for template 016, 201, 202 */
++typedef struct _ULINK_TEMPLATE
++{
++    unsigned short int num;
++    unsigned short int rev;
++    unsigned short int cnt;
++    unsigned short int len;
++    char res[8];  /* reserved bytes*/
++    ULINK_CELL *cells;
++}ULINK_TEMPLATE;
++
+ typedef enum __PCIE_NPORT_MAP
+ {
+     PCIE_NPORT_INVALID = -1,
+@@ -4392,6 +4415,21 @@ int fc_sys_enumerate(OUT char *fc_port_sys_id[], IN int max_count);
+ int Net_NIC_Set_QM2_Conf(IN char *nickname, IN char *eth_port);
+ int Net_NIC_Get_QM2_Conf(IN int port_id, OUT char *qm2_name);
+ 
++
++int common_ulink_read_template_data(char *file, char *blob);
++unsigned int common_sys_read_num_from_buffer(char *value, int size, int *offset);
++void common_ulink_create_cell(ULINK_CELL *cell, char* blob, int i, int offset);
++ULINK_TEMPLATE* common_ulink_read_template_from_file(char *fpath);
++void common_sys_write_data_to_buffer(char *blob, void *value, int size, int *offset);
++void common_ulink_dump_cell_to_buffer(ULINK_CELL *cell, char *blob, int offset);
++int common_sys_dump_buffer_to_file(char *fpath, char *blob);
++int common_ulink_dump_template_to_file(ULINK_TEMPLATE *tmp, char *fpath);
++ULINK_TEMPLATE* common_ulink_init_template(int tnum);
++ULINK_TEMPLATE* common_ulink_init_template_with_cell(int tnum);
++void common_ulink_free_template(ULINK_TEMPLATE *tmp);
++int pd_sys_inc_ata_errcnt(IN char *sn, IN int tnum, IN int id);
++int pd_sys_set_ata_iotest_val(IN char *sn, IN int tnum, IN int id, IN int val);
++int pd_sys_get_disk_statistic_data(IN int tnum, IN char *sn, OUT char *buf);
+ #ifdef __cplusplus
+ }
+ #endif      /* __cplusplus */
+diff --git a/NasLib/hal/hal_da_util.h b/NasLib/hal/hal_da_util.h
+new file mode 100644
+index 00000000000..bea39c9c26e
+--- /dev/null
++++ b/NasLib/hal/hal_da_util.h
+@@ -0,0 +1,11 @@
++
++#define TEMPLATE16_CNT  15
++#define TEMPLATE201_CNT  10
++#define TEMPLATE202_CNT  5
++
++
++
++struct da_temp_info {
++    int len;
++    int temp_num;
++};
+diff --git a/NasLib/hal/hal_event.h b/NasLib/hal/hal_event.h
+index 84ac1af45cb..91660844cc5 100755
+--- a/NasLib/hal/hal_event.h
++++ b/NasLib/hal/hal_event.h
+@@ -24,6 +24,7 @@ typedef enum
+     HAL_EVENT_BBU,
+     HAL_EVENT_ZFS,
+     HAL_EVENT_MAX_EVT_NUM,
++    HAL_EVENT_CONTROL,
+ } EVT_FUNC_TYPE;
+ 
+ #ifndef USB_DRV_DEFINED
+@@ -76,6 +77,9 @@ typedef enum
+     SET_NCQ_BY_USER,
+     SET_NCQ_BY_KERNEL,
+     GET_PD_SMART,
++    SET_PD_ATA_QC_ERROR,    // for netlink
++    SET_PD_ATA_LINK_ERROR,    // for netlink
++    SET_PD_SCSI_CMD_ERROR,    // for netlink
+ 
+ // For RAID    
+     REPAIR_RAID_READ_ERROR = 100,   //1,5,6,10, for netlink,reconstruct
+@@ -149,8 +153,17 @@ typedef enum
+     ZFS_SCRUB_START,
+     ZFS_SCRUB_COMPLETE,
+     ZFS_SCRUB_CANCEL,
++// For EVENT_CONTROL
++    DA_EVENT_ENABLE,
+ } EVT_FUNC_ACTION;
+ 
++typedef enum {
++    SCSI_CMD_HAL_RETRY,
++    SCSI_CMD_HAL_FAIL,
++    SCSI_CMD_HAL_LONG_LATENCY,
++    SCSI_CMD_HAL_TIMES_OUT,
++} SCSI_CMD_HALTYPE;
++
+ typedef struct
+ {
+     EVT_FUNC_ACTION action;
+@@ -253,6 +266,24 @@ typedef struct
+             unsigned char error_sense_key[3]; //sense_key,ASC,ASCQ
+             unsigned char error_scsi_cmd[16];
+         } __attribute__ ((__packed__)) netlink_pd;
++        struct __netlink_pd_scsi_cmd_err
++        {
++            int action; // retry = 0, fail = 1
++            int value; 
++            int scsi_bus[4];
++            unsigned char error_scsi_cmd[16];
++        } __attribute__ ((__packed__)) netlink_pd_scsi_cmd_err;
++        struct __netlink_pd_ata_qc_err
++        {
++            int scsi_bus[4];
++            unsigned char state;
++            unsigned char err;
++        } __attribute__ ((__packed__)) netlink_pd_ata_qc_err;
++        struct __netlink_pd_ata_link_err
++        {
++            unsigned int serror;
++            int scsi_bus[4];
++        } __attribute__ ((__packed__)) netlink_pd_ata_link_err;
+         struct __netlink_raid_cb
+         {
+             int raid_id;
+@@ -362,6 +393,10 @@ typedef struct
+         {
+             int learning_action;
+         } __attribute__ ((__packed__)) bbu_learning;
++        struct __event_control
++        {
++            int value;
++        } __attribute__ ((__packed__)) event_control;
+     } param;
+ }__attribute__ ((__packed__))
+ EVT_FUNC_ARG;
+diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
+index 35e3b720150..06190a9c033 100755
+--- a/NasLib/hal/hal_pd.c
++++ b/NasLib/hal/hal_pd.c
+@@ -7823,6 +7823,10 @@ int pd_attach(char *enc_sys_id, char *pd_sys_id)
+                         ERR_TRACE(TRACE_ENTRY, "%-30s: cmd_line = %s.\n", __func__, cmd_line);
+                         ERR_TRACE(TRACE_ENTRY, "%-30s: enc_sys_id = %s, pd_sys_id = %s.\n", __func__, enc_sys_id, pd_sys_id);
+                     }
++
++                    if(enc_id >= 0 && enc_id <= 31)  // 32 --> boot disk, 33 --> usb
++                        PD_Set_ATA_IO_Latency(&pd_info);    
++
+                 }
+                 else
+                 {
+@@ -10260,3 +10264,116 @@ int mtp_detach(IN char *mtp_sys_id)
+     return 0;
+ }
+ 
++
++/**
++ * @fn int PD_Inc_ATA_ErrCnt(char *sn, int tnum, int id)
++ * @brief Increase ATA Error count. 
++ *
++ * This function is called by nas utility to increase the error count for drive.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is increased sucessful.
++ * @retval -1 Generic failure, Fail to increase the value.
++ */
++int PD_Inc_ATA_ErrCnt(IN char *sn, IN int tnum, IN int id)
++{
++    return pd_sys_inc_ata_errcnt(sn, tnum, id);
++}
++
++/**
++ * @fn int PD_Set_ATA_IOTest_Val(char *sn, int tnum, int id)
++ * @brief Set IOTest Value for ATA drive.
++ *
++ * This function is called by nas utility to set the value of iotest result.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is set successful.
++ * @retval -1 Generic failure, Fail to set the value.
++ */
++int PD_Set_ATA_IOTest_Val(IN char *sn, IN int tnum, IN int id, IN int val)
++{
++    return pd_sys_set_ata_iotest_val(sn, tnum, id, val);
++}
++
++/**
++ * @fn int PD_Set_ATA_IO_Latency(PD_INFO *pd_info)
++ * @brief Set io latency for ata disk.
++ *
++ * This function is called by nas utility to set the value for io latency.
++ * @param[in] *pd_info is the physical disk info.
++ * @retval 0 Success, the value is set successful.
++ * @retval -1 Generic failure, Fail to set the value.
++ */
++int PD_Set_ATA_IO_Latency(IN PD_INFO *pd_info)
++{
++    int i;
++    int j;
++    char cmd[512] = {0};
++    if(pd_info->type != PD_SATA)
++    {
++        return -1;
++    }
++    for(i = 0 ; pd_info->pd_sys_name[i] != '\0' ; i++)
++    {
++        if (pd_info->pd_sys_name[i] == '/')
++        {
++            j = i;
++        }
++    }
++
++    ERR_TRACE(TRACE_INFO, "set pd latency:(%s, %s)\n", pd_info->serial_no, &(pd_info->pd_sys_name[j + 1]));    
++
++    if(pd_info->capabilities & PD_CAP_SSD)
++    {
++        sprintf(cmd, "echo 300 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
++        system(cmd);
++    }
++    else
++    {
++        sprintf(cmd, "echo 1000 > /sys/block/%s/device/qnap_param_latency", &(pd_info->pd_sys_name[j + 1]));
++        system(cmd);
++    }
++    return 0;
++}
++
++/**
++ * @fn int PD_Get_Disk_Statistic_Data(IN int enc_id, IN int port_id, IN int tnum, OUT char *buf)
++ * @brief Get the disk statistic data by enc_id, port_id and template number.
++ *
++ * This function will get the disk statistic data by enc_id, port_id and template number.
++ *
++ * @param[in] enc_id Enclosure id
++ * @param[in] port_id Disk Port id
++ * @param[in] tnum TEMPLATE NUMBER
++ * @param[out] *buf Buffer for the disk statistic data.
++ *
++ * @retval 0 Success.
++ * @retval -1 Generic failure.
++ */
++int PD_Get_Disk_Statistic_Data(IN int enc_id, IN int port_id, IN int tnum, OUT char *buf)
++{
++    PD_INFO pd_info;
++
++    memset(&pd_info, 0 , sizeof(pd_info));
++
++    if (PD_Get_Info(enc_id, port_id, &pd_info) == 0)
++    {
++        if(pd_info.type != PD_SATA)
++        {
++            ERR_TRACE(TRACE_INFO, "This is not a SATA drive:(enc_id=%d, port_id=%d)\n", enc_id, port_id);    
++            return -1;
++        }
++        return pd_sys_get_disk_statistic_data(tnum, pd_info.serial_no, buf); 
++    }
++    else
++    {
++        ERR_TRACE(TRACE_INFO, "Can't get pd_info:(enc_id=%d, port_id=%d)\n", enc_id, port_id);    
++        return -1;
++    }
++}
++
++
++
++
+diff --git a/NasLib/hal/hal_sys_common.c b/NasLib/hal/hal_sys_common.c
+index f1b0fdee262..673bc544ae4 100755
+--- a/NasLib/hal/hal_sys_common.c
++++ b/NasLib/hal/hal_sys_common.c
+@@ -30,6 +30,7 @@
+ #include "hal_sys_common.h"
+ #include "err_trace.h"
+ #include "hal_utils.h"
++#include "hal_da_util.h"
+ 
+ static char *qm2_class_str[] =
+ {
+@@ -4530,3 +4531,226 @@ int comm_sys_get_root_pcie_link(IN char *enc_sys_id, IN char* pd_sys_id, IN int
+     return 0;
+ }
+ 
++int common_ulink_read_template_data(char *file, char *blob)
++{
++    int ret;
++    int fd = open(file, O_RDONLY, 0644);
++    ret = read(fd, blob, ULINK_TEMPLATE_SIZE);
++    close(fd);
++    return ret;
++}
++
++unsigned int common_sys_read_num_from_buffer(char *value, int size, int *offset)
++{
++    int num = 0;
++    int i;
++    /*
++    for(i = 0 ; i < size ; i++)
++    {
++        num = num << 8;
++        num |= (value[*offset + i] & 0xff);
++    }
++    */
++    for(i = size - 1 ; i >= 0 ; i--)
++    {
++        num = num << 8;
++        num |= (value[*offset + i] & 0xff);
++    }
++    *offset += size;
++    return num;
++}
++
++void common_ulink_create_cell(ULINK_CELL *cell, char* blob, int i, int offset)
++{
++    int coffset = offset;
++    cell->id = common_sys_read_num_from_buffer(blob, 2, &coffset);
++    cell->flag = common_sys_read_num_from_buffer(blob, 2, &coffset);
++    cell->val = common_sys_read_num_from_buffer(blob, 4, &coffset);
++}
++
++ULINK_TEMPLATE* common_ulink_read_template_from_file(char *fpath)
++{
++    int i;
++    int offset = 0;
++    char blob[ULINK_TEMPLATE_SIZE] = {0};
++    ULINK_TEMPLATE *tmp = (ULINK_TEMPLATE*)malloc(sizeof(ULINK_TEMPLATE));
++
++    if(tmp == NULL)
++    {
++        return NULL;
++    }
++    if (common_ulink_read_template_data(fpath, blob) < 0)
++    {
++        free(tmp);
++        return NULL;
++    }
++    tmp->num = common_sys_read_num_from_buffer(blob, 2, &offset);
++    tmp->rev = common_sys_read_num_from_buffer(blob, 2, &offset);
++    tmp->cnt = common_sys_read_num_from_buffer(blob, 2, &offset);
++    tmp->len = common_sys_read_num_from_buffer(blob, 2, &offset);
++    offset += ULINK_TEMPLATE_RESERVE_BYTES;
++    if(tmp->cnt != 0)
++    {
++        tmp->cells = (ULINK_CELL*) malloc(sizeof(ULINK_CELL) * tmp->cnt);
++        if(tmp->cells != NULL)
++        {
++            for(i = 0 ; i < tmp->cnt ; i++)
++            {
++                common_ulink_create_cell(&(tmp->cells[i]), blob, i, offset);
++                offset += ULINK_CELL_SIZE;
++            }
++        }
++        else
++        {
++			free(tmp);
++			return NULL;
++        }
++    }
++    return tmp;
++}
++
++void common_sys_write_data_to_buffer(char *blob, void *value, int size, int *offset)
++{
++    int i = *offset;
++    int* ivalue = (unsigned int*) value;
++    if(size == 4)
++    {
++        blob[i] = (*ivalue) & 0xFF;
++        blob[i + 1] = (*ivalue >> 8) & 0xFF;
++        blob[i + 2] = (*ivalue >> 16) & 0xFF;
++        blob[i + 3] = (*ivalue >> 24) & 0xFF;
++    }
++    else if(size == 2)
++    {
++        blob[i] = (*ivalue) & 0xFF;
++        blob[i + 1] = (*ivalue >> 8) & 0xFF;
++    }
++    
++    else if(size == 1)
++    {
++        blob[i] = (*ivalue) & 0xFF;
++    }
++    *offset += size;
++}
++
++void common_ulink_dump_cell_to_buffer(ULINK_CELL *cell, char *blob, int offset)
++{
++    int coff = offset;
++    common_sys_write_data_to_buffer(blob, &(cell->id), 2, &coff);
++    common_sys_write_data_to_buffer(blob, &(cell->flag), 2, &coff);
++    common_sys_write_data_to_buffer(blob, &(cell->val), 4, &coff);
++}
++
++int common_sys_dump_buffer_to_file(char *fpath, char *blob)
++{
++     int ret;
++     int i;
++     int fd = open(fpath, O_CREAT | O_WRONLY, 0644);
++     ret = write(fd, blob, ULINK_TEMPLATE_SIZE);
++     close(fd);
++     return ret;
++}
++
++int common_ulink_dump_template_to_file(ULINK_TEMPLATE *tmp, char *fpath)
++{
++    int i;
++    int ret;
++    int offset = 0;
++    char blob[ULINK_TEMPLATE_SIZE] = {0};
++
++    common_sys_write_data_to_buffer(blob, &(tmp->num), 2, &offset);
++    common_sys_write_data_to_buffer(blob, &(tmp->rev), 2, &offset);
++    common_sys_write_data_to_buffer(blob, &(tmp->cnt), 2, &offset);
++    common_sys_write_data_to_buffer(blob, &(tmp->len), 2, &offset);
++    offset += ULINK_TEMPLATE_RESERVE_BYTES;
++
++    for(i = 0 ; i < tmp->cnt ; i++)
++    {
++        common_ulink_dump_cell_to_buffer((tmp->cells) + i, blob, offset);
++        offset += ULINK_CELL_SIZE;
++    }
++
++    ret = common_sys_dump_buffer_to_file(fpath, blob);
++    if (ret < 0)
++    {
++        return ret;
++    }
++    return 0;
++}
++
++ULINK_TEMPLATE* common_ulink_init_template(int tnum)
++{
++    ULINK_TEMPLATE *tmp = (ULINK_TEMPLATE*)malloc(sizeof(ULINK_TEMPLATE));
++    if(tmp == NULL)
++    {
++        return NULL;
++    }
++
++    switch (tnum)
++    {
++        case 16:
++            tmp->num = 16;
++            tmp->rev = 100;
++            tmp->cnt = TEMPLATE16_CNT;
++            tmp->len = ULINK_TEMPLATE_SIZE;
++            break;
++        case 201:
++            tmp->num = 201;
++            tmp->rev = 100;
++            tmp->cnt = TEMPLATE201_CNT;
++            tmp->len = ULINK_TEMPLATE_SIZE;
++            break;
++        case 202:
++            tmp->num = 202;
++            tmp->rev = 100;
++            tmp->cnt = TEMPLATE202_CNT;
++            tmp->len = ULINK_TEMPLATE_SIZE;
++            break;
++        default:
++            printf("template number is not correct\n");
++            free(tmp);
++            tmp = NULL;
++            break;
++    }
++    return tmp;
++}
++
++ULINK_TEMPLATE* common_ulink_init_template_with_cell(int tnum)
++{
++    int i;
++    ULINK_TEMPLATE *tmp = common_ulink_init_template(tnum);
++    if(tmp == NULL)
++    {
++        return NULL;
++    }
++
++    tmp->cells = (ULINK_CELL*)malloc(sizeof(ULINK_CELL) * (tmp->cnt));
++
++    if(tmp->cells != NULL)
++    {
++        for(i = 0 ; i < tmp->cnt ; i++)
++        {
++            tmp->cells[i].id = (i + 1);
++            tmp->cells[i].flag = 1;
++            tmp->cells[i].val = 0;
++        }
++        return tmp;
++    }
++    else
++    {
++        free(tmp);
++        return NULL;
++    }
++}
++
++void common_ulink_free_template(ULINK_TEMPLATE *tmp)
++{
++    if(tmp)
++    {
++        if(tmp->cells)
++        {
++            free(tmp->cells);
++        }
++        free(tmp);
++    }
++}
+diff --git a/NasLib/hal/hal_sys_enc.c b/NasLib/hal/hal_sys_enc.c
+index 89c35a7c0a9..021199a01aa 100755
+--- a/NasLib/hal/hal_sys_enc.c
++++ b/NasLib/hal/hal_sys_enc.c
+@@ -11752,15 +11752,23 @@ int se_sys_set_disk_data_collection(IN int enable)
+         {
+             snprintf(cmd, sizeof(cmd), "echo \"$(($RANDOM % 60)) 3 * * * /bin/sh %s\" >> /etc/config/crontab", NAS_DISK_DATA_COLLECTION_SCRIPT);
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "echo \"* 2 * * * /bin/sh %s\" >> /etc/config/crontab", NAS_DISK_DATA_IOTEST_SCRIPT);
++            system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=1");
++            system(cmd);
+         }
+         else if (enable == 0)
+         {
+             snprintf(cmd, sizeof(cmd), "/bin/sed -i '/disk_data_collection/d' /etc/config/crontab");
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "/bin/sed -i '/da_iotest/d' /etc/config/crontab");
++            system(cmd);
+             snprintf(cmd, sizeof(cmd), "/usr/bin/crontab /etc/config/crontab -c /tmp/cron/crontabs &> /dev/null");
+             system(cmd);
++            snprintf(cmd, sizeof(cmd), "/sbin/da_util --enable value=0");
++            system(cmd);
+         }
+         ret = 0;
+     }
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index aea2938d40d..1726cbd1680 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -26,6 +26,7 @@
+ #include <signal.h>
+ #include <sys/prctl.h>
+ #include <pthread.h>
++#include <mntent.h>
+ #include "hal_common.h"
+ #include "hal_sys.h"
+ #include "hal_sys_common.h"
+@@ -36,6 +37,7 @@
+ #include "hal_sys_scsi.h"
+ #include "hal_sys_raidapi.h"
+ #include "hal_enc.h"
++#include "hal_da_util.h"
+ 
+ typedef struct _NVME_PASSTHRU_CMD
+ {
+@@ -13517,6 +13519,86 @@ int hash_string_by_sha256sum(IN char *string, OUT char *result, IN int result_le
+     return 0;
+ }
+ 
++void da_dump_data_to_file(FILE *nvme_out_file, struct da_temp_info datainfo, char *raw_data)
++{
++    int i;    
++    for (i = 0; i < datainfo.len; i++)
++        fputc(raw_data[i], nvme_out_file);
++
++}
++
++void append_data_to_header(char *disk_data_tmpfile, char *nvme_tmpfile, int disk_data_offset)
++{
++    char cmd[256] = {0};
++    sprintf(cmd, "dd if=%s of=%s seek=%d bs=1", nvme_tmpfile, disk_data_tmpfile, disk_data_offset);
++    system(cmd);
++}
++
++int da_util_read_file(char *file, char *blob)
++{
++    int ret;
++    int fd = open(file, O_RDONLY, 0644);
++    ret = read(fd, blob, 512);
++    close(fd);
++    return ret;
++}
++
++void da_util_cmd_getoutput(char *cmd, char *buf, int len)
++{
++    FILE *fr;
++    fr = popen(cmd, "r");
++
++    fgets(buf, len, fr);
++    return;
++    
++}
++
++void da_util_str_split(char *buf, char delim, char *str1, char *str2)
++{
++    int i;
++    for(i = 0 ; buf[i] != '\0'; i++)
++    {
++        if(buf[i] == delim)
++            break;
++    }
++    sprintf(str1, "%.*s", i, buf);
++    sprintf(str2, "%s", buf + i + 1);
++    return;
++}
++
++void da_util_str_strip(char *str)
++{
++    int i;
++    for(i = 0 ; str[i] != '\0'; i++)
++    {
++        if(str[i] == '\n')
++            break;
++    }
++    str[i] = '\0';
++    return;
++}
++
++
++int da_util_get_raid_info(int enc_id, int port_id, char *blob)
++{
++    char status[4] = {0};
++    char path[64] = {0};
++    char buf[64];
++    char cmd[64] = {0};
++
++    sprintf(cmd, "/sbin/da_util --system_raid_info enc_id=%d,port_id=%d", enc_id, port_id);
++    da_util_cmd_getoutput(cmd, buf, 64);
++    da_util_str_split(buf, ',', status, path);
++    if(atoi(status) != 0)
++    {
++        ERR_TRACE(TRACE_ERROR, "HAL fail to get raid info enc_id=%d,port_id=%d --> %s, %s\n", enc_id, port_id, status, path);
++        return -1;
++    }
++    da_util_str_strip(path);
++    da_util_read_file(path, blob);
++    return 0;
++}
++
+ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_id, IN int port_id)
+ {
+     struct ata_smart_attribute *attribute_entry;
+@@ -13546,36 +13628,79 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+     char *raw_data = NULL;
+     PD_NVME_ERROR_LOG_PAGE *nvme_err_log;
+     PD_NVME_SELF_TEST_LOG nvme_self_test_log;
+-
++    PD_INFO pd_info; 
++     
++    ret = pd_sys_getinfo(enc_sys_id, pd_sys_id, &pd_info);
++    if(ret != 0)
++    {
++        return -1;
++    }
+ 
+     if (!strncmp(enc_sys_id, ENC_TR_PREFIX_SYS_ID, strlen(ENC_TR_PREFIX_SYS_ID))) {
+         return -1;
+-    } else if (!strncmp(pd_sys_id, "nvme", 4)) {
++    } 
++    else if(pd_info.type == PD_SAS)
++    {
++        sprintf(cmd, "/sbin/da_util --sas enc_id=%d,port_id=%d", enc_id, port_id);
++        ERR_TRACE(TRACE_DEBUG, "pd_sys_get_data_package : %s\n", cmd);
++        system(cmd);
++    }
++    else if (!strncmp(pd_sys_id, "nvme", 4)) {
++        
++        // 1. gen_data_file, get length
++        
++        FILE *nvme_out_file = NULL;
++        char nvme_tmpfile[128] = {0};
++        struct da_temp_info datainfo[TEMPLATE_NVME_MAX_ITEMS];
++        char blob[512] = {0};
++
++        memset(datainfo, 0, sizeof(struct da_temp_info) * TEMPLATE_NVME_MAX_ITEMS);
++
++        sprintf(nvme_tmpfile, "/tmp/nvme_info_%d_%d" ,enc_id, port_id);
++        nvme_out_file = fopen(nvme_tmpfile, "w");
++
+         if (pd_sys_get_nvme_ident(enc_sys_id, pd_sys_id, &nvme_id_ctrl) == 0) {
+-            template_bitmap |= (1 << TEMPLATE_NVME_IDENTIFY_CTRL);
++            datainfo[0].len = 4096;
++            datainfo[0].temp_num = 101 + TEMPLATE_NVME_IDENTIFY_CTRL;
++            da_dump_data_to_file(nvme_out_file, datainfo[0], &nvme_id_ctrl);
+         }
+ 
+         if (pd_sys_get_nvme_ident_namespace(enc_sys_id, pd_sys_id, &nvme_id_ns) == 0) {
+-            template_bitmap |= (1 << TEMPLATE_NVME_IDENTIFY_NAMESPACE);
++            datainfo[1].len = 4096;
++            datainfo[1].temp_num = 101 + TEMPLATE_NVME_IDENTIFY_NAMESPACE;
++            da_dump_data_to_file(nvme_out_file, datainfo[1], &nvme_id_ns);
+         }
+ 
+         if (pd_sys_get_nvme_smart(enc_sys_id, pd_sys_id, &nvme_smart) == 0) {
+-            template_bitmap |= (1 << TEMPLATE_NVME_SMART_LOG);
++            datainfo[2].len = 512;
++            datainfo[2].temp_num = 101 + TEMPLATE_NVME_SMART_LOG;
++            da_dump_data_to_file(nvme_out_file, datainfo[2], &nvme_smart);
+         }
+ 
+-        if (template_bitmap & (1 << TEMPLATE_NVME_IDENTIFY_CTRL)) {
+-            nvme_data_template_resp_size[TEMPLATE_NVME_ERR_LOG] = (nvme_id_ctrl.elpe + 1) * sizeof(PD_NVME_ERROR_LOG_PAGE);
+-            nvme_err_log = calloc(nvme_data_template_resp_size[TEMPLATE_NVME_ERR_LOG], sizeof(PD_NVME_ERROR_LOG_PAGE));
++        if (datainfo[0].len > 0) {
++            datainfo[3].len = (nvme_id_ctrl.elpe + 1) * sizeof(PD_NVME_ERROR_LOG_PAGE);
++            nvme_err_log = calloc(datainfo[3].len, sizeof(char));
+             if (pd_sys_get_nvme_all_errlogs(pd_sys_id, nvme_id_ctrl.elpe + 1, nvme_err_log) == 0) {
+-                template_bitmap |= (1 << TEMPLATE_NVME_ERR_LOG);
++                datainfo[3].temp_num = 101 + TEMPLATE_NVME_ERR_LOG;
++                da_dump_data_to_file(nvme_out_file, datainfo[3], nvme_err_log);
++                free(nvme_err_log);
+             }
+         }
+ 
+         if (pd_sys_get_nvme_selftest_logs(pd_sys_id, &nvme_self_test_log) == 0) {
+-            template_bitmap |= (1 << TEMPLATE_NVME_SELF_TEST);
++            datainfo[4].len = 560;
++            datainfo[4].temp_num = 101 + TEMPLATE_NVME_SELF_TEST;
++            da_dump_data_to_file(nvme_out_file, datainfo[4], &nvme_self_test_log.result);
+         }
+ 
++        if (da_util_get_raid_info(enc_id, port_id, blob) == 0) {
++            datainfo[5].len = 512;
++            datainfo[5].temp_num = 203;
++            da_dump_data_to_file(nvme_out_file, datainfo[5], blob);
++        }
++        fclose(nvme_out_file);
+ 
++        // 2. generate header
+         snprintf(disk_data_tmpfile, sizeof(disk_data_tmpfile), DISK_DATA_PATH, enc_id, port_id);
+         pOutput_File = fopen(disk_data_tmpfile, "w");
+ 
+@@ -13749,14 +13874,24 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         fprintf(pOutput_File, "Attribute: Regular\n");
+ 
+         disk_data_offset = DISK_DATA_PACKAGE_HEADER_SIZE;
++
++        count = 0;
++        for(index = 0 ; index < TEMPLATE_NVME_MAX_ITEMS ; index++)
++        {
++            if(datainfo[index].len <= 0)
++                continue;
++            count += 1;
++        }
++        fprintf(pOutput_File, "No. of Records: %d\n", count);
++
+         count = 1;
+         for (index = TEMPLATE_NVME_IDENTIFY_CTRL; index < TEMPLATE_NVME_MAX_ITEMS; index++) {
+-            if (!(template_bitmap & (0x01 << index)))
++            if(datainfo[index].len <= 0)
+                 continue;
+             fprintf(pOutput_File, "Record %d byte index: %d\n", count, disk_data_offset);
+-            fprintf(pOutput_File, "Record %d length: %d\n", count, nvme_data_template_resp_size[index]);
+-            fprintf(pOutput_File, "Record %d template: %03d\n", count, 101 + index);
+-            disk_data_offset += nvme_data_template_resp_size[index];
++            fprintf(pOutput_File, "Record %d length: %d\n", count, datainfo[index].len);
++            fprintf(pOutput_File, "Record %d template: %03d\n", count, datainfo[index].temp_num);
++            disk_data_offset += datainfo[index].len;
+             count++;
+         }
+ 
+@@ -13764,54 +13899,11 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         /* Here's the end of the meaningful data header. */
+ 
+         fseek(pOutput_File, DISK_DATA_PACKAGE_HEADER_SIZE, SEEK_SET);
+-        disk_data_offset = DISK_DATA_PACKAGE_HEADER_SIZE;
+-        for (index = TEMPLATE_NVME_IDENTIFY_CTRL; index < TEMPLATE_NVME_MAX_ITEMS; index++) {
+-            if (!(template_bitmap & (0x1 << index)))
+-                continue;
+-            switch (index) {
+-            case TEMPLATE_NVME_IDENTIFY_CTRL:
+-                raw_data = &nvme_id_ctrl;
+-                for (resp_index = 0; resp_index < 4096; resp_index++)
+-                    fputc(raw_data[resp_index], pOutput_File);
+-                disk_data_offset += nvme_data_template_resp_size[TEMPLATE_NVME_IDENTIFY_CTRL];
+-                fseek(pOutput_File, disk_data_offset, SEEK_SET);
+-                break;
+-            case TEMPLATE_NVME_IDENTIFY_NAMESPACE:
+-                raw_data = &nvme_id_ns;
+-                for (resp_index = 0; resp_index < 4096; resp_index++)
+-                    fputc(raw_data[resp_index], pOutput_File);
+-                disk_data_offset += nvme_data_template_resp_size[TEMPLATE_NVME_IDENTIFY_NAMESPACE];;
+-                fseek(pOutput_File, disk_data_offset, SEEK_SET);
+-                break;
+-            case TEMPLATE_NVME_SMART_LOG:
+-                raw_data = &nvme_smart;
+-                for (resp_index = 0; resp_index < 512; resp_index++)
+-                    fputc(raw_data[resp_index], pOutput_File);
+-                disk_data_offset += nvme_data_template_resp_size[TEMPLATE_NVME_SMART_LOG];
+-                fseek(pOutput_File, disk_data_offset, SEEK_SET);
+-                break;
+-            case TEMPLATE_NVME_ERR_LOG:
+-                raw_data = nvme_err_log;
+-                for (resp_index = 0; resp_index < nvme_data_template_resp_size[TEMPLATE_NVME_ERR_LOG]; resp_index++)
+-                    fputc(raw_data[resp_index], pOutput_File);
+-                disk_data_offset += nvme_data_template_resp_size[TEMPLATE_NVME_ERR_LOG];
+-                fseek(pOutput_File, disk_data_offset, SEEK_SET);
+-                free(nvme_err_log);
+-                break;
+-            case TEMPLATE_NVME_SELF_TEST:
+-                raw_data = &nvme_self_test_log.result;
+-                for (resp_index = 0; resp_index < nvme_data_template_resp_size[TEMPLATE_NVME_SELF_TEST]; resp_index++)
+-                    fputc(raw_data[resp_index], pOutput_File);
+-                disk_data_offset += nvme_data_template_resp_size[TEMPLATE_NVME_SELF_TEST];
+-                fseek(pOutput_File, disk_data_offset, SEEK_SET);
+-                break;
+-
+-            default:
+-                break;
+-            }
+-        }
+         fclose(pOutput_File);
+ 
++        // append data into header file
++        append_data_to_header(disk_data_tmpfile, nvme_tmpfile, DISK_DATA_PACKAGE_HEADER_SIZE);
++
+     } else {
+         snprintf(pd_ctrl_name, MAX_PD_CTRL_NAME, "/dev/%s", pd_sys_id);
+ 
+@@ -14240,6 +14332,93 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+                 }
+             }
+ 
++            // New flow start
++            int ret;
++            int da_i;
++            int sata_max_template_num = 4;
++            FILE *sata_out_file = NULL;
++            char sata_tmpfile[128] = {0};
++            struct da_temp_info datainfo[4];
++            char blob[512] = {0};
++
++            memset(datainfo, 0, sizeof(struct da_temp_info) * sata_max_template_num);
++
++            sprintf(sata_tmpfile, "/tmp/sata_info_%d_Ed" ,enc_id, port_id);
++            sata_out_file = fopen(sata_tmpfile, "w");
++            
++            for(da_i = 0 ; da_i < sata_max_template_num ; da_i++)
++            {
++                if(da_i == 0)
++                {
++                    memset(blob, 0x0, sizeof(blob));
++                    
++                    ret = pd_sys_get_disk_statistic_data(DISK_DATA_TEMPLATE_SATA_INTERFACE_STATISTICS + 1, pd_info.serial_no, blob);
++                    if(ret == 0)
++                    {
++                        datainfo[da_i].len = 512;
++                        datainfo[da_i].temp_num = 16;
++                        da_dump_data_to_file(sata_out_file, datainfo[da_i], blob);
++                    }
++                    else
++                    {
++                        ERR_TRACE(TRACE_INFO, "%s : fail to get data of template 16 : %d\n", __func__, ret);
++                    }
++                }
++                else if(da_i == 1)
++                {
++                    memset(blob, 0x0, sizeof(blob));
++                    
++                    ret = pd_sys_get_disk_statistic_data(201, pd_info.serial_no, blob);
++                    if(ret == 0)
++                    {
++                        datainfo[da_i].len = 512;
++                        datainfo[da_i].temp_num = 201;
++                        da_dump_data_to_file(sata_out_file, datainfo[da_i], blob);
++                    }
++                    else
++                    {
++                        ERR_TRACE(TRACE_INFO, "%s : fail to get data of template 201 : %d\n", __func__, ret);
++                    }
++                }
++                else if(da_i == 2)
++                {
++                    memset(blob, 0x0, sizeof(blob));
++                    
++                    ret = pd_sys_get_disk_statistic_data(202, pd_info.serial_no, blob);
++                    if(ret == 0)
++                    {
++                        datainfo[da_i].len = 512;
++                        datainfo[da_i].temp_num = 202;
++                        da_dump_data_to_file(sata_out_file, datainfo[da_i], blob);
++                    }
++                    else
++                    {
++                        ERR_TRACE(TRACE_INFO, "%s : fail to get data of template 202 : %d\n", __func__, ret);
++                    }
++                }
++
++                else if(da_i == 3)
++                {
++                    memset(blob, 0x0, sizeof(blob));
++                    if (da_util_get_raid_info(enc_id, port_id, blob) == 0) {
++                        datainfo[da_i].len = 512;
++                        datainfo[da_i].temp_num = 203;
++                        da_dump_data_to_file(sata_out_file, datainfo[da_i], blob);
++                    }
++                }
++            }
++            fclose(sata_out_file);
++
++            for(da_i = 0 ; da_i < sata_max_template_num ; da_i++)
++            {
++                if(datainfo[da_i].len > 0)
++                {
++                    record_count += 1;
++                }
++            }
++
++            // New flow end
++
+             fprintf(pOutput_File, "No. of Records: %d\n", record_count);
+ 
+             // QTS default uploads all the Template.
+@@ -14360,6 +14539,18 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+ 
+             ERR_TRACE(TRACE_INFO, "%s: template_bitmap 0x%x\n", __func__, template_bitmap);
+ 
++            for(da_i = 0 ; da_i < sata_max_template_num ; da_i++)
++            {
++                if(datainfo[da_i].len > 0)
++                {
++                    count++;
++                    fprintf(pOutput_File, "Record %d byte index: %d\n", count, disk_data_offset);
++                    fprintf(pOutput_File, "Record %d length: %d\n", count, datainfo[da_i].len);
++                    fprintf(pOutput_File, "Record %d template: %03d\n", count, datainfo[da_i].temp_num);
++                    disk_data_offset += datainfo[da_i].len;
++                }
++            }
++
+             fprintf(pOutput_File, "END");
+             /* Here's the end of the meaningful data header. */
+             
+@@ -14815,10 +15006,6 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+                         }
+                         break;
+ 
+-                    case DISK_DATA_TEMPLATE_SATA_INTERFACE_STATISTICS:
+-                        // TBD
+-                        break;
+-
+                     default:
+                         break;
+                 }
+@@ -14826,6 +15013,9 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+ 
+             if (pOutput_File)
+                 fclose(pOutput_File);
++
++            // append data into header file
++            append_data_to_header(disk_data_tmpfile, sata_tmpfile, disk_data_offset);
+         }
+     }
+     return count;
+@@ -17666,3 +17856,160 @@ int pd_sys_set_blk_dev_queue_depth(IN char *pd_sys_id, IN int depth)
+ out:
+     return ret;
+ }
++
++int check_default_volume_location()
++{
++    FILE *fp;
++    struct mntent *fs;
++
++    fp = setmntent("/etc/mtab", "r");   /* read only */
++    if (fp == NULL) {
++		ERR_TRACE(TRACE_ERROR, "%s(%d): can not open /etc/mtab\n", __func__, __LINE__);
++        return -1;
++    }
++
++    while ((fs = getmntent(fp)) != NULL)
++    {
++        if(strcmp("/share/CACHEDEV1_DATA", fs->mnt_dir) == 0)
++        {
++            return 0;
++        }
++    }
++
++    endmntent(fp);
++    return -1;
++}
++
++int check_disk_data_location()
++{
++    struct stat s;
++    int err;
++
++    if(check_default_volume_location() != 0)
++    {
++		ERR_TRACE(TRACE_ERROR, "%s(%d): default volume is not exist\n", __func__, __LINE__);
++        return -1; 
++    }
++
++    err = stat(NAS_DISK_DATA_LOCATION, &s);
++    if(err == -1)
++    {
++        if(mkdir(NAS_DISK_DATA_LOCATION, 0755) == -1)  
++        {   
++		    ERR_TRACE(TRACE_ERROR, "%s(%d): Fail to create .disk_data folder\n", __func__, __LINE__);
++            return -1;   
++        }  
++    }
++    return 0;
++}
++
++/**
++ * @fn int pd_sys_inc_ata_errcnt(char *sn, int tnum, int id)
++ * @brief Increase ATA Error count. 
++ *
++ * This function is called by nas utility to increase the error count for drive.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is increased sucessful.
++ * @retval -1 Generic failure, Fail to increase the value.
++ */
++int pd_sys_inc_ata_errcnt(IN char *sn, IN int tnum, IN int id)
++{
++    ULINK_TEMPLATE *tmp;
++    char fpath[512] = {0};
++    sprintf(fpath, NAS_DISK_DATA_LOCATION"/disk_data_%s_%d", sn, tnum);
++
++    if(check_disk_data_location() != 0)
++    {
++        return -1;
++    }
++
++    if( access( fpath, F_OK ) != -1 )
++    {
++        tmp = common_ulink_read_template_from_file(fpath);
++    }
++    else
++    {
++        tmp = common_ulink_init_template_with_cell(tnum);
++    }
++    if(tmp)
++    {
++        tmp->cells[id - 1].val += 1; // index = id - 1
++        common_ulink_dump_template_to_file(tmp, fpath);
++        common_ulink_free_template(tmp);    
++    }
++    return 0;
++}
++/**
++ * @fn int pd_sys_set_ata_iotest_val(char *sn, int tnum, int id)
++ * @brief Set IOTest Value for ATA drive.
++ *
++ * This function is called by nas utility to set the value of iotest result.
++ * @param[in] *sn is the serial number of the disk.
++ * @param[in] tnum is the template number defined by ULINK spec.
++ * @param[in] id is the cell if defined by ULINK spec.
++ * @retval 0 Success, the value is set successful.
++ * @retval -1 Generic failure, Fail to set the value.
++ */
++int pd_sys_set_ata_iotest_val(IN char *sn, IN int tnum, IN int id, IN int val)
++{
++    ULINK_TEMPLATE *tmp;
++    char fpath[512] = {0};
++
++    if(check_disk_data_location() != 0)
++    {
++        return -1;
++    }
++
++    sprintf(fpath, NAS_DISK_DATA_LOCATION"/disk_data_%s_%d", sn, tnum);
++    if( access( fpath, F_OK ) != -1 )
++    {
++        tmp = common_ulink_read_template_from_file(fpath);
++    }
++    else
++    {
++        tmp = common_ulink_init_template_with_cell(tnum);
++    }
++    if(tmp)
++    {
++        tmp->cells[id - 1].val = val; // index = id - 1
++        common_ulink_dump_template_to_file(tmp, fpath);
++        common_ulink_free_template(tmp);    
++    }
++    return 0;
++}
++
++/**
++ * @fn int pd_sys_get_disk_statistic_data(IN int tnum, IN char *sn, OUT char *buf)
++ * @brief Get the disk statistic data by serial number and template number.
++ *
++ * This function will get the disk statistic data by serial number and template number.
++ *
++ * @param[in] tnum TEMPLATE NUMBER
++ * @param[in] *sn Serial number of the disk.
++ * @param[out] *buf Buffer for the disk statistic data.
++ *
++ * @retval 0 Success.
++ * @retval -1 Generic failure.
++ */
++int pd_sys_get_disk_statistic_data(IN int tnum, IN char *sn, OUT char *buf)
++{
++    ULINK_TEMPLATE *tmp = NULL;
++    char fpath[512] = {0};
++
++    if(check_disk_data_location() != 0)
++    {
++        return -1;
++    }
++
++    sprintf(fpath, NAS_DISK_DATA_LOCATION"/disk_data_%s_%d", sn, tnum);
++    if( access( fpath, F_OK ) == -1 )
++    {
++        tmp = common_ulink_init_template_with_cell(tnum);
++        common_ulink_dump_template_to_file(tmp, fpath);
++        common_ulink_free_template(tmp);    
++    }
++    common_ulink_read_template_data(fpath, buf);
++    return 0;
++}
+diff --git a/NasUtil/Makefile b/NasUtil/Makefile
+index 25ec6ed0c75..b820cc006e3 100755
+--- a/NasUtil/Makefile
++++ b/NasUtil/Makefile
+@@ -455,7 +455,7 @@ ifeq (${CUSTOM_SERVICE},yes)
+ endif
+ 
+ ifeq (${QNAP_HAL_SUPPORT},yes)
+-	ALL+= hal_util storage_util br_util ssdutil pic_tool snapshot_util
++	ALL+= hal_util storage_util br_util ssdutil pic_tool snapshot_util da_util
+ ifneq (${TARGET_PLATFORM}, ARM_MS)
+ 	ALL+= sas_updater
+ endif
+diff --git a/NasUtil/da_util/Makefile b/NasUtil/da_util/Makefile
+new file mode 100644
+index 00000000000..b99180b044a
+--- /dev/null
++++ b/NasUtil/da_util/Makefile
+@@ -0,0 +1,24 @@
++
++INCLUDES = -I$(NAS_LIB_PATH)/include -I$(NAS_LIB_PATH)/storage_man_v2 -I$(NAS_LIB_PATH)/uLinux -I$(NAS_LIB_PATH)/hal
++
++LIBS = -L${ROOT_PATH}/usr/lib -L${TARGET_PREFIX}/usr/lib -L${TARGET_PREFIX}/lib -luLinux_Storage -luLinux_hal -luLinux_ini
++
++#CROSS_COMPILE = arm-none-linux-gnueabi-
++CC = ${CROSS_COMPILE}gcc
++CFLAGS = -Wall -O2
++
++DA_UTIL_SRC = da_sas.c da_iotest.c da_util.c da_func.c da_system.c
++DA_UTIL_OBJS = da_sas.o da_iotest.o da_util.o da_func.o da_system.o
++
++all: $(DA_UTIL_OBJS)
++	$(CC) $(CFLAGS) $(INCLUDES) $(DA_UTIL_OBJS) -o da_util $(LIBS)
++
++$(DA_UTIL_OBJS): 
++	$(CC) -c $(INCLUDES) $(DA_UTIL_SRC) $(LIBS)
++
++install :
++	${CROSS_COMPILE}strip da_util
++	install --mode=755 da_util ${ROOT_PATH}/sbin
++
++clean:
++	rm -f *.o da_util
+diff --git a/NasUtil/da_util/da_func.c b/NasUtil/da_util/da_func.c
+new file mode 100644
+index 00000000000..0cf19a42bea
+--- /dev/null
++++ b/NasUtil/da_util/da_func.c
+@@ -0,0 +1,75 @@
++#include <linux/netlink.h>
++#include <sys/socket.h> 
++
++#include "da_util.h"
++
++void EVT_Send_To_Kernel(int sock_fd, NETLINK_EVT *event)
++{
++    struct nlmsghdr *nlh = NULL;
++    struct iovec iov;
++    struct msghdr msg;
++    NETLINK_EVT *data;
++    int ret;
++
++    memset(&msg, 0, sizeof(struct msghdr));
++    if ((nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(sizeof(NETLINK_EVT)))) == NULL)
++    {
++        printf("da_util error: fail to alloc nlmsghdr\n");
++        return;
++    }
++    memset(nlh, 0, NLMSG_SPACE(sizeof(NETLINK_EVT)));
++
++    iov.iov_base = (void *)nlh;
++    iov.iov_len = NLMSG_SPACE(sizeof(NETLINK_EVT));
++    msg.msg_iov = &iov;
++    msg.msg_iovlen = 1;
++
++    data = (NETLINK_EVT *)NLMSG_DATA(nlh);
++    memcpy(data, event, sizeof(NETLINK_EVT));
++    ret = sendmsg(sock_fd, &msg,0);
++    if (ret < 0)
++        printf("da_util error: fail to send netlink message:%d\n", ret);
++    free(nlh);
++}
++
++int da_enable_by_cfg(struct paras_in paras)
++{
++    int ret;
++    ret = system("/bin/cat /etc/config/crontab | /bin/grep disk_data_collection");
++    if(ret != 0)
++    {
++        printf("disk_data_collection is not enabled\n");
++        return ret;
++    }
++    return da_enable(paras);
++}
++
++int da_enable(struct paras_in paras)
++{
++    int value;
++    int sock_fd;
++    NETLINK_EVT event;
++
++    value = atoi(paras.value);
++    printf("da_enable : value = %d\n", value);
++    event.type = HAL_EVENT_CONTROL;
++    event.arg.action = DA_EVENT_ENABLE;
++    event.arg.param.event_control.value = value;
++
++    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USERSOCK);
++    if(sock_fd == -1)
++    {
++        printf("da_util fail : fail to create netlink socket.");
++    }
++
++    EVT_Send_To_Kernel(sock_fd, &event);
++
++    return 0;
++}
++
++
++
++
++
++
++
+diff --git a/NasUtil/da_util/da_iotest.c b/NasUtil/da_util/da_iotest.c
+new file mode 100644
+index 00000000000..ea48514ff30
+--- /dev/null
++++ b/NasUtil/da_util/da_iotest.c
+@@ -0,0 +1,93 @@
++#include "da_util.h"
++#include "da_iotest.h"
++
++
++int fio_popen(char *cmd, char *buf)
++{
++    FILE *pp = popen(cmd, "r");
++    if (!pp) {
++        return -1;
++    }
++    fgets(buf, 1024, pp); 
++    pclose(pp);
++    return strlen(buf);
++}
++
++unsigned int fio_parse(char *buf, int pos)
++{
++    unsigned int ret = 0;
++    int i = 0;
++    int j = 0;
++    int length = strlen(buf);
++    while (i < length && j < pos)
++    {
++        if(buf[i] == ';')
++        {
++            j += 1;
++        }
++        i += 1;
++    }
++    while (i < length && buf[i] != ';')
++    {
++        ret = ret * 10 + (buf[i] - '0');
++        i += 1;
++    }
++    return ret;
++}
++
++void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long long length)
++{
++    char buf[1024] = {0};
++    int ret = -1;
++    unsigned int val = 0;
++
++    struct ulink_iotest_param params[4] = {
++        { "randread", 4, 7, 201, 4, 1 },  //IOPS
++        { "randwrite", 4, 48, 201, 5, 1 }, 
++        { "read", 128, 6, 201, 8, 1000 },  //MBPS
++        { "write", 128, 47, 201, 9, 1000 }, 
++    };
++        
++    char cmd[1024] = {0};
++    int i;
++    for(i = 0 ; i < 4 ; i++)
++    {
++        sprintf(cmd, "fio --name=%s --iodepth=32 --rw=%s --bs=%dK --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=%llu --size=%llu", 
++            devname, params[i].ioname, params[i].bw, begin, length);
++        printf("%s\n", cmd);
++        ret = fio_popen(cmd, buf);
++        if(ret < 0)
++        {
++            continue;
++        }
++        // set template value;
++        val = fio_parse(buf, params[i].pos_fio);
++        printf("%s = (%s, %d)\n", sn, params[i].ioname, val);
++        PD_Set_ATA_IOTest_Val(sn, params[i].tnum, params[i].id, val/params[i].base);
++    }
++
++
++}
++
++/*
++Example:
++./da_util --iotest enc_id=0,port_id=1
++
++*/
++int da_iotest(struct paras_in paras)
++{
++    PD_INFO pd_info;
++    char devname[256] = {0};
++    unsigned long long begin;
++    unsigned long long length;
++
++    if (PD_Get_Info(paras.enc_id, paras.port_id, &pd_info) < 0)
++    {
++        return -1;
++    }
++
++    NAS_Disk_Get_Test_Range(paras.enc_id, paras.port_id, devname, 256, &begin, &length); 
++    printf("(%s : %s : %s : %d : %d)\n", pd_info.pd_sys_name, pd_info.serial_no, devname, begin, length); 
++    fio_iotest(pd_info.serial_no, devname, begin, length);
++    return 0;
++}
+diff --git a/NasUtil/da_util/da_iotest.h b/NasUtil/da_util/da_iotest.h
+new file mode 100644
+index 00000000000..7ad4b954ee0
+--- /dev/null
++++ b/NasUtil/da_util/da_iotest.h
+@@ -0,0 +1,9 @@
++
++struct ulink_iotest_param {
++    char ioname[16];
++    int bw; 
++    int pos_fio;
++    int tnum;
++    int id;
++    int base;
++};
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+new file mode 100644
+index 00000000000..833a595cf3b
+--- /dev/null
++++ b/NasUtil/da_util/da_sas.c
+@@ -0,0 +1,981 @@
++
++#include "da_util.h"
++#include "da_sas.h"
++
++
++void dump_datainfo(struct datainfo *dinfo)
++{
++    int i;
++    int total = 0;
++    for(i = 0 ; i < SAS_FUNC_NUM + NAS_FUNC_NUM ; i++)
++    {
++        printf("(template, op, length) = (%d, %02x, %d)\n", dinfo[i].temp_num, dinfo[i].op, dinfo[i].len);
++        total += dinfo[i].len;
++    }
++    printf("(total) = %d\n", total);
++}
++
++int dump_buf_to_file(int fd, char *buf, int blen)
++{
++    return write(fd, buf, blen);
++}
++
++void dump_log_page_buffer(char *buf)
++{
++    int i;
++    int page_base = 4;
++    int page_length = PAGE_LEN_COMB(buf[2], buf[3]);
++    printf("page header: ");
++    for(i = 0 ; i < 4 ; i++)
++    {
++        printf("%x ", buf[i] & 0xff);
++    }
++    printf("\n");
++    int j = page_base;
++    while(j < (page_length + page_base))
++    {
++        int parm_base = j + 4;
++        int parm_len = buf[j + 3];
++        for(j ; j < parm_base ; j++)
++        {
++            printf("%x ", buf[j] & 0xff);
++        }
++        printf("\n");
++        for(j ; j < (parm_base + parm_len) ; j++)
++        {
++            printf("%02x ", buf[j] & 0xff);
++        }
++        printf("\n");
++    }
++    
++}
++
++void dump_vpd_buffer(char *p)
++{
++    int i;
++    for(i = 0 ; i < 4 ; i++)
++    {
++        printf("%x\n", p[i] & 0xff);
++    }
++    for(i = 4 ; i < p[3] ; i++)
++    {
++        printf("%x ", p[i] & 0xff);
++    }
++    printf("\n");
++    for(i = 0 ; i < p[3] ; i++)
++    {
++        printf("%c ", p[i + 4]);
++    }
++    printf("\n");
++
++}
++
++int send_scsi_command(int sg_fd, struct scsi_paras *sparas)
++{
++    unsigned char sense_buffer[32];
++    sg_io_hdr_t io_hdr;
++
++    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
++    io_hdr.interface_id = 'S';
++    io_hdr.cmd_len = sparas->cmd_len;
++    io_hdr.mx_sb_len = sizeof(sense_buffer);
++    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
++    io_hdr.dxfer_len = sparas->buf_len;
++    io_hdr.dxferp = sparas->buf;
++    io_hdr.cmdp = sparas->cmd;
++    io_hdr.sbp = sense_buffer;
++    io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
++
++    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
++        perror("sg_simple0: Inquiry SG_IO ioctl error");
++        return -1;
++    }
++    
++    if ((io_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) 
++    {
++        return -1;
++    }
++    return 0;
++}
++
++void gen_log_sense_cmd(unsigned char *cmd, unsigned char op, int len)
++{
++    cmd[0] = LOG_SENSE_CMD_CODE;
++    cmd[1] = 0x00;
++    cmd[2] = 0x40 | op;
++    cmd[3] = 0x00;
++    cmd[4] = 0x00;
++    cmd[5] = 0x00;
++    cmd[6] = 0x00;
++    cmd[7] = 0xff & (LOG_SENSE_REPLY_LEN >> 8);
++    cmd[8] = 0xff & LOG_SENSE_REPLY_LEN;
++    cmd[9] = 0x00;
++}
++
++void get_sup_pages(int sg_fd)
++{
++    int i, ret, plen;
++    unsigned char cmd[LOG_SENSE_CMD_LEN];
++    unsigned char buf[LOG_SENSE_REPLY_LEN];
++    struct scsi_paras sparas;
++    
++    gen_log_sense_cmd(cmd, 0x00, LOG_SENSE_REPLY_LEN);
++
++    sparas.buf = buf;
++    sparas.buf_len = LOG_SENSE_REPLY_LEN;
++    sparas.cmd = cmd;
++    sparas.cmd_len = LOG_SENSE_CMD_LEN;
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("get support pages fail : %d\n", ret);
++        return;
++    }
++
++    plen = PAGE_LEN_COMB(buf[2], buf[3]);
++    sup_pages = malloc(sizeof(unsigned char) * plen);
++    printf("support pages: ");
++    for(i = 0 ; i < plen ; i++)
++    {
++        sup_pages[i] = buf[4 + i];
++        printf("%02x ", sup_pages[i]);
++    }
++    printf("\n");
++    len_sup_pages = plen;
++}
++
++int is_support(unsigned char op, unsigned char *sup, int len)
++{
++    int i;
++    for(i = 0 ; i < len ; i++)
++    {
++        if(sup[i] == op)
++        {
++            return 0;
++        }
++    }
++    return -1;
++}
++
++int send_log_sense_command(int sg_fd, unsigned char op, int data_fd)
++{
++    int len = -1;
++    int ret;
++    unsigned char cmd[LOG_SENSE_CMD_LEN];
++    unsigned char buf[LOG_SENSE_REPLY_LEN];
++    struct scsi_paras sparas;
++    int i;
++    
++    if(is_support(op, sup_pages, len_sup_pages) != 0)
++    {
++        printf("Log sense page: This opcode is not supported : %02x\n", op);
++        return -2;
++    }
++
++    gen_log_sense_cmd(cmd, op, LOG_SENSE_REPLY_LEN);
++
++    sparas.buf = buf;
++    sparas.buf_len = LOG_SENSE_REPLY_LEN;
++    sparas.cmd = cmd;
++    sparas.cmd_len = LOG_SENSE_CMD_LEN;
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_log_sense_command fail : (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = 4 + PAGE_LEN_COMB(buf[2], buf[3]);
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
++void gen_inquiry_vpd_cmd(unsigned char *cmd, unsigned char op, int len)
++{
++    cmd[0] = INQ_CMD_CODE;
++    cmd[1] = 0x01;
++    cmd[2] = op;
++    cmd[3] = 0xff & (len >> 8);
++    cmd[4] = 0xff & len;
++    cmd[5] = 0x00;
++}
++
++void gen_standard_inquiry_cmd(unsigned char *cmd, unsigned char op, int len)
++{
++    cmd[0] = INQ_CMD_CODE;
++    cmd[1] = 0x00;
++    cmd[2] = 0x00;
++    cmd[3] = 0xff & (len >> 8);
++    cmd[4] = 0xff & len;
++    cmd[5] = 0x00;
++}
++
++void get_sup_vpds(int sg_fd)
++{
++    int i, ret, plen;
++    unsigned char cmd[INQ_CMD_LEN];
++    unsigned char buf[INQ_REPLY_LEN];
++    struct scsi_paras sparas;
++    
++    gen_inquiry_vpd_cmd(cmd, 0x00, sizeof(buf));
++
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("get support vpds fail : %d\n", ret);
++        return;
++    }
++
++    plen = buf[3];
++    sup_vpds = malloc(sizeof(unsigned char) * plen);
++    printf("support vpds: ");
++    for(i = 0 ; i < plen ; i++)
++    {
++        sup_vpds[i] = buf[4 + i];
++        printf("%02x ", sup_vpds[i]);
++    }
++    printf("\n");
++    len_sup_vpds = plen;
++}
++
++int send_standard_inquiry_command(int sg_fd, unsigned char op, int data_fd)
++{
++    int len = -1;
++    int ret;
++    unsigned char cmd[INQ_CMD_LEN];
++    unsigned char buf[INQ_REPLY_LEN];
++    struct scsi_paras sparas;
++
++    gen_standard_inquiry_cmd(cmd, op, sizeof(buf));
++
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_standard_inquiry_command fail : (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = 5 + buf[4];
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
++int send_inquiry_vpd_command(int sg_fd, unsigned char op, int data_fd)
++{
++    int len = -1;
++    int ret;
++    unsigned char cmd[INQ_CMD_LEN];
++    unsigned char buf[INQ_REPLY_LEN];
++    struct scsi_paras sparas;
++    
++    if(is_support(op, sup_vpds, len_sup_vpds) != 0)
++    {
++        printf("Inquiry VPD: This opcode is not supported : %02x\n", op);
++        return -2;
++    }
++
++    gen_inquiry_vpd_cmd(cmd, op, sizeof(buf));
++
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_inquiry_vpd_command fail : (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = 4 + buf[3];
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
++int send_read_capacity_10(int sg_fd, unsigned char op, int data_fd)
++{
++    int ret = -1;
++    int len = -1; 
++    struct scsi_paras sparas;
++    unsigned char buf[READ_CAPACITY_10_REPLY_LEN];
++    unsigned char cmd[READ_CAPACITY_10_CMD_LEN] = {
++        READ_CAPACITY_10, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++    };
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_read_capacity_10 fail: (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = sizeof(buf);
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
++int send_read_capacity_16(int sg_fd, unsigned char op, int data_fd)
++{
++    int ret = -1;
++    int len = -1; 
++    struct scsi_paras sparas;
++    unsigned char buf[READ_CAPACITY_16_REPLY_LEN];
++    unsigned char cmd[READ_CAPACITY_16_CMD_LEN] = {
++        READ_CAPACITY_16, 
++        0x10, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x00, 
++        0x20, 
++        0x00, 
++        0x00, 
++    };
++    sparas.buf = buf;
++    sparas.buf_len = sizeof(buf);
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("send_read_capacity_16 fail: (%d, %d)\n", op, ret);
++        return -1;
++    }
++    len = sizeof(buf);
++    dump_buf_to_file(data_fd, buf, len);
++    return len;
++}
++
++void gen_read_defect_data_12_cmd_and_buf(unsigned char *cmd, unsigned char op, int index, int reply_len)
++{
++    cmd[0] = READ_DEFECT_DATA_12;
++    cmd[1] = op;
++    //cmd[1] = 0x0c; //--> Gworing defect list
++    //cmd[1] = 0x14; //--> Primary defect list
++    cmd[2] = 0xff & (index >> 24);
++    cmd[3] = 0xff & (index >> 16);
++    cmd[4] = 0xff & (index >> 8);
++    cmd[5] = 0xff & (index >> 0);
++    cmd[6] = 0xff & (reply_len >> 24);
++    cmd[7] = 0xff & (reply_len >> 16);
++    cmd[8] = 0xff & (reply_len >> 8);
++    cmd[9] = 0xff & (reply_len >> 0);
++    cmd[10] = 0x00;
++    cmd[11] = 0x00;
++    
++}
++
++unsigned int dump_defect_data_length(int sg_fd, int data_fd, unsigned char op)
++{
++    int ret = -1;
++    unsigned int len = -1; 
++    int reply_len = READ_DEFECT_DATA_12_REPLY_LEN;
++    struct scsi_paras sparas;
++    unsigned char buf[reply_len];
++    unsigned char cmd[READ_DEFECT_DATA_12_CMD_LEN];
++
++    gen_read_defect_data_12_cmd_and_buf(cmd, op, 0, reply_len);
++     
++    sparas.buf = buf;
++    sparas.buf_len = reply_len;
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("get_defect_data_length fail: %d\n", ret);
++        return -1;
++    }
++    len = DEFECT12_LEN_COMB(buf[4], buf[5], buf[6], buf[7]);
++    dump_buf_to_file(data_fd, buf, reply_len);
++    return len;
++}
++
++int send_read_defect_data_12_partial(int sg_fd, int data_fd, unsigned char op, int index, unsigned char *buf, int buf_len)
++{
++    int ret = -1;
++    struct scsi_paras sparas;
++    unsigned char cmd[READ_DEFECT_DATA_12_CMD_LEN];
++
++    gen_read_defect_data_12_cmd_and_buf(cmd, op, index, buf_len);
++     
++    sparas.buf = buf;
++    sparas.buf_len = buf_len;
++    sparas.cmd = cmd;
++    sparas.cmd_len = sizeof(cmd);
++    ret = send_scsi_command(sg_fd, &sparas);
++    if (ret != 0)
++    {
++        printf("get_defect_data_length fail: (index, ret) = (%d, %d)\n", index, ret);
++        return -1;
++    }
++    return 0;
++    
++}
++
++int dump_defect_data_list(int sg_fd, int data_fd, unsigned char op, int total_adds)
++{
++    unsigned char buf[READ_DEFECT_DATA_12_BUFFER] = {0};
++    int items;
++    int index = 0;
++    int ret;
++    int dump_bytes = READ_DEFECT_DATA_12_BUFFER - 8;
++    int total_bytes = 0;
++
++    while (index < total_adds)
++    {
++        ret = send_read_defect_data_12_partial(sg_fd, data_fd, op, index, buf, READ_DEFECT_DATA_12_BUFFER);
++        if(ret != 0)
++        {
++            break;
++        }
++        items = (dump_bytes) / 8;
++        if((index + items) >= total_adds)
++        {
++            dump_bytes = (total_adds - index) * 8;
++            items = (dump_bytes) / 8;
++        }
++        dump_buf_to_file(data_fd, buf + 8, dump_bytes);
++        index += items;
++        total_bytes += dump_bytes;
++        printf("(index, total_adds, dump, total) = (%d, %d, %d, %d)\n", index, total_adds, dump_bytes, total_bytes);
++    }
++}
++
++void split_str(char *line, int len, char *key, char *val, char delim)
++{
++    int i;
++    for(i = 0 ; i < len ; i++)
++    {
++        if(line[i] == delim)
++        {
++            break;
++        }
++    }
++    sprintf(key, "%.*s", i, line);
++    sprintf(val, "%s", line + i + 1);
++}
++
++unsigned int get_read_da_cfg(char *qkey, unsigned int dval)
++{
++    char path[] = "/etc/da_util/da_util.conf";
++    FILE *fp;
++    unsigned int ret = dval;
++    char *line = NULL;
++    size_t len = 0;
++    char key[32] = {0};
++    char val[32] = {0};
++
++    if( access( path, F_OK ) != -1 )
++    {
++        fp = fopen(path, "r");
++
++        if(fp == NULL) {
++            perror("Unable to open file!");
++            return -1;
++        }
++
++        while(getline(&line, &len, fp) != -1) {
++            split_str(line, len, key, val, '=');
++            if(strcmp(key, qkey) == 0)
++            {
++                ret = atoi(val);
++                break;
++            }
++        }
++        fclose(fp);
++        free(line);
++    }
++    
++    printf("get_read_da_cfg:(key, ret) = (%s,%u)\n", qkey, ret);
++    return ret;
++}
++
++int send_read_defect_data_12_plist(int sg_fd, unsigned char op, int data_fd)
++{
++    int ret = -1;
++    int len = -1; 
++    unsigned int llen = -1;
++    unsigned int clen = 512;
++
++    if (get_read_da_cfg("333_enable", 1) == 0) // default: 333_enable = 1;
++    {
++       return 0; 
++    }
++    
++    clen = get_read_da_cfg("333_len", 512); // default: 333_len = 512;
++    llen = dump_defect_data_length(sg_fd, data_fd, op);
++    if(llen < 0)
++    {
++        printf("send_read_capacity_16 fail(get list length): (%d, %d)\n", op, llen);
++    }
++    
++    if(clen > llen)
++    {
++        clen = llen;
++    }
++    printf("get defect list length : (bytes, blocks) = (%u, %d), real list length : %u bytes\n", llen, llen/8, clen);
++    ret = dump_defect_data_list(sg_fd, data_fd, op, clen/8);
++    len = 8 + clen;
++    return len;
++}
++
++int send_read_defect_data_12_glist(int sg_fd, unsigned char op, int data_fd)
++{
++    int ret = -1;
++    int len = -1; 
++    unsigned int llen = -1;
++    unsigned int clen = 512;
++
++    clen = get_read_da_cfg("332_len", 512); // default: 332_len = 512;
++    llen = dump_defect_data_length(sg_fd, data_fd, op);
++    if(llen < 0)
++    {
++        printf("send_read_capacity_16 fail(get list length): (%d, %d)\n", op, llen);
++    }
++    
++    if(clen > llen)
++    {
++        clen = llen;
++    }
++    printf("get defect list length : (bytes, blocks) = (%u, %d), real list length : %u bytes\n", llen, llen/8, clen);
++    ret = dump_defect_data_list(sg_fd, data_fd, op, clen/8);
++    len = 8 + clen;
++    return len;
++}
++
++int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd)
++{
++    int ret = -1;
++    int len = -1; 
++    unsigned int llen = -1;
++    unsigned int clen = 512;
++    
++    if(op == READ_DEFECT_DATA_12_PLIST)
++    {
++        return send_read_defect_data_12_plist(sg_fd, op, data_fd);
++    }
++    else
++    {
++        return send_read_defect_data_12_glist(sg_fd, op, data_fd);
++    }
++}
++
++void browse_all_funcs(int sg_fd, struct datainfo *dinfo, int data_fd)
++{
++    int i, len;
++
++    for(i = 0 ; i < SAS_FUNC_NUM ; i++)
++    {
++        dinfo[i].temp_num = funcs[i].temp_num;
++        dinfo[i].op = funcs[i].opcode;
++        dinfo[i].len = funcs[i].func(sg_fd, funcs[i].opcode, data_fd);
++    }
++}
++
++void da_gen_sas_data_file(char *dev, int enc_id, int port_id, struct datainfo *dinfo, char *sas_path)
++{
++    int i, data_fd;
++    int sg_fd;
++
++    if ((sg_fd = open(dev, O_RDONLY)) < 0) {
++        perror("error opening given file name");
++        return;
++    }
++    sprintf(sas_path,  "/tmp/disk_sas_data_%d_%d", enc_id, port_id);
++
++    if(access( sas_path, F_OK ) != -1)
++    {
++        unlink(sas_path);
++    }
++    data_fd = open(sas_path, O_CREAT | O_WRONLY, 0644);
++
++    get_sup_pages(sg_fd);
++    get_sup_vpds(sg_fd);
++     
++    browse_all_funcs(sg_fd, dinfo, data_fd);
++    close(data_fd);
++    close(sg_fd);
++}
++
++
++extern int _da_system_raid_info(int enc_id, int port_id, char *blob);
++
++int read_raid_info(unsigned char op, struct nas_paras *paras)
++{
++    int ret;
++    int len;
++    
++    char blob[ULINK_TEMPLATE_SIZE] = {0};
++    
++    len = _da_system_raid_info(paras->enc_id, paras->port_id, blob);
++    if(len < 0)
++    {
++        fprintf(stderr, "%s(%d) Fail to get raid info (%d, %d)\n", __func__, __LINE__, paras->enc_id, paras->port_id);
++        return -1;
++    }
++    ret = dump_buf_to_file(paras->data_fd, blob, ULINK_TEMPLATE_SIZE);
++    if (ret == -1)
++    {
++        fprintf(stderr, "Fail to dump buffer (%d, %d)\n", paras->enc_id, paras->port_id);
++        perror("");
++        return -1;
++    }
++    return len;
++}
++
++void da_gen_nas_data_file(int enc_id, int port_id, struct datainfo *dinfo, char *nas_path, int offset)
++{
++    int i, j, data_fd;
++    struct nas_paras paras;
++
++    sprintf(nas_path,  "/tmp/disk_nas_data_%d_%d", enc_id, port_id);
++
++    if(access( nas_path, F_OK ) != -1)
++    {
++        unlink(nas_path);
++    }
++    data_fd = open(nas_path, O_CREAT | O_WRONLY, 0644);
++    if(data_fd < 0)
++    {
++        perror("Can not open nas_path\n");
++    }
++    paras.enc_id = enc_id;
++    paras.port_id = port_id;
++    paras.data_fd = data_fd;
++
++    for(i = 0 ; i < NAS_FUNC_NUM ; i++)
++    {
++        j = offset + i;
++        dinfo[j].temp_num = nasfuncs[i].temp_num;
++        dinfo[j].op = nasfuncs[i].opcode;
++        dinfo[j].len = nasfuncs[i].func(nasfuncs[i].opcode, &paras);
++    }
++    close(data_fd);
++}
++
++void da_gen_sas_header(struct datainfo *dinfo, int enc_id, int port_id, char *disk_data_tmpfile)
++{
++    int i, cnt, disk_data_offset;
++    char cmd[MAX_BUF_LEN];
++    char buf[MAX_BUF_LEN];
++    char buf2[MAX_BUF_LEN];
++    char hash_result[MAX_CMD_LEN];
++    FILE *pOutput_File = NULL, *fp = NULL;
++
++    sprintf(disk_data_tmpfile, DISK_DATA_PATH, enc_id, port_id); 
++    if(access(disk_data_tmpfile, F_OK) != -1)
++    {
++        unlink(disk_data_tmpfile);
++    }
++
++    pOutput_File = fopen(disk_data_tmpfile, "w");
++    fprintf(pOutput_File, "Header Size: %d\n", DISK_SAS_DATA_PACKAGE_HEADER_SIZE);
++    fprintf(pOutput_File, QNAP_DRIVE_ANALYZER);
++    fprintf(pOutput_File, "Version: %s\n", QNAP_DRIVE_ANALYZER_VERSION);
++    fprintf(pOutput_File, "Copyright @QNAP Technology 2019\n");
++    fprintf(pOutput_File, "Signature: Drive Health Data\n");
++    memset(cmd, 0x0, MAX_BUF_LEN);
++    memset(buf, 0x0, MAX_BUF_LEN);
++    fp = popen("/bin/date '+%Y-%m-%d' 2>/dev/null", "r");
++    if (fp)
++    {
++        fgets(buf, sizeof(buf), fp);
++        fprintf(pOutput_File, "Date: %s", buf);
++        pclose(fp);
++    }
++
++    memset(cmd, 0x0, MAX_BUF_LEN);
++    memset(buf, 0x0, MAX_BUF_LEN);
++    fp = popen("/bin/date '+%H:%M:%S' 2>/dev/null", "r");
++    if (fp)
++    {
++        fgets(buf, sizeof(buf), fp);
++        fprintf(pOutput_File, "Time: %s", buf);
++        pclose(fp);
++    }
++
++    /*
++     *              * Model Number:
++     *                           * IF enc_id = 0 THEN [NAS Model Number (eg. TVS-871T) ], else
++     *                           [EXPANSION Model Number (eg. REXP-1620U-RP-US)]
++     */                                        
++    if (enc_id == 0)
++    {
++        if (!HAL_MB_Get_Display_Name(buf, MAX_BUF_LEN))
++            fprintf(pOutput_File, "Model Number: %s\n", buf);
++    }
++    else
++    {
++        memset(cmd, 0x0, MAX_BUF_LEN);
++        memset(buf, 0x0, MAX_BUF_LEN);
++        snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"model\" -f %s", enc_id, HAL_CONF_FILE);
++        fp = popen(cmd, "r");
++        if (fp)
++        {
++            fgets(buf, sizeof(buf), fp);
++            fprintf(pOutput_File, "Model Number: %s", buf);
++            pclose(fp);
++        }
++    }
++
++    /*
++     *          * Serial Number:
++     *                   * IF enc_id = 0 THEN [NAS Serial Number (eg. Q18AE00945) ]  else
++     *                   [EXPANSION Serial Number ]
++     *                            */
++    if (enc_id == 0)
++    {
++        if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
++            fprintf(pOutput_File, "Serial Number: %s\n", buf);
++    }
++    else
++    {
++        memset(cmd, 0x0, MAX_BUF_LEN);
++        memset(buf, 0x0, MAX_BUF_LEN);
++        memset(buf2, 0x0, MAX_BUF_LEN);
++        snprintf(cmd, sizeof(cmd), "/sbin/getcfg \"Enclosure_%d\" \"serial\" -f %s", enc_id, HAL_CONF_FILE);
++        fp = popen(cmd, "r");
++        if (fp)
++        {
++            fgets(buf, sizeof(buf), fp);
++            fprintf(pOutput_File, "Serial Number: %s", buf);
++            pclose(fp);
++        }
++    }
++    if ((Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Version", buf, sizeof(buf)) >= 0) &&
++            (Ini_Conf_Get_Field(NAS_CONF_FILE, "System", "Build Number", buf2, sizeof(buf2)) >= 0))
++        fprintf(pOutput_File, "Firmware Version: %s (%s)\n", buf, buf2);
++
++    /*
++     *          * Host ID:
++     *                   * IF enc_id = 0  THEN  [NAS Device Name (eg. Chen-NASF93291) ], else [Host
++     *                   NAS Serial Number]
++     *                            */
++    if (enc_id == 0)
++    {
++        memset(buf, 0x0, MAX_BUF_LEN);
++        fp = popen("/bin/hostname 2>/dev/null", "r");
++        if (fp)
++        {
++            fgets(buf, sizeof(buf), fp);
++            fprintf(pOutput_File, "Host ID: %s", buf);
++            pclose(fp);
++        }
++        else
++        {
++            if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
++                fprintf(pOutput_File, "Host ID: %s\n", buf);
++        }
++    }
++    else
++    {
++        if (!HAL_MB_Get_Serial_No(buf, MAX_BUF_LEN))
++            fprintf(pOutput_File, "Host ID: %s\n", buf);
++    }
++
++    fprintf(pOutput_File, "Rack Number: %d\n", enc_id);   // 1 based enclosure idenditifer
++    fprintf(pOutput_File, "Slot Number: %d\n", port_id);
++
++    memset(buf, 0x0, MAX_BUF_LEN);
++    fp = popen("/bin/uname -r 2>/dev/null", "r");
++    if (fp)
++    {
++        fgets(buf, sizeof(buf), fp);
++        fprintf(pOutput_File, "System FW: linux-%s", buf);
++        pclose(fp);
++    }
++
++    memset(buf, 0x0, MAX_BUF_LEN);
++    fp = popen("/bin/uname -o 2>/dev/null", "r");
++    if (fp)
++    {
++        fgets(buf, sizeof(buf), fp);
++        fprintf(pOutput_File, "OS: %s", buf);
++        pclose(fp);
++    }
++
++
++    // TBD
++    fprintf(pOutput_File, "Driver:\n");
++
++    memset(buf, 0x0, MAX_BUF_LEN);
++    fp = popen("/bin/cat /etc/hosts | grep eth | cut -d ' ' -f 0", "r");
++    if (fp)
++    {
++        fgets(buf, sizeof(buf), fp);
++        pclose(fp);
++    }
++
++    // If fail to obtain the Host IP, use another way to retrieve the Host IP
++    if (strlen(buf) == 0)
++    {
++        fp = popen("/bin/cat /etc/hosts | grep bond | cut -d ' ' -f 0", "r");
++        if (fp)
++        {
++            fgets(buf, sizeof(buf), fp);
++            pclose(fp);
++        }
++    }
++    
++    // If fail to obtain the Host IP, use another way to retrieve the Host IP
++    if (strlen(buf) == 0)
++    {
++        char cmd_buf[2048] = {0}, *s, *p;
++        fp = popen("qsh NetworkService.api.get_currentGWinfo", "r");
++        if (fp)
++        {
++            fgets(cmd_buf, sizeof(cmd_buf), fp);
++            s = strstr(cmd_buf, "ip\":\"");
++            if (s)
++            {
++                s += strlen("ip\":\"");
++                //if (s)
++                //{
++                p = strchr(s, '"');
++                if (p != NULL)
++                    *p = 0x0;
++                //printf("======\n%s(%d)\n======\n", s, (int)strlen(s));
++                //}
++            }
++            pclose(fp);
++        }
++    }
++    memset(hash_result, sizeof(hash_result), 0x0);
++    if (strlen(buf) && (hash_string_by_sha256sum(buf, hash_result, sizeof(hash_result)) == 0))
++        fprintf(pOutput_File, "Host IP: %s\n", hash_result);
++    else
++        fprintf(pOutput_File, "Host IP:\n");
++
++    fprintf(pOutput_File, "Interface: SAS\n");
++    fprintf(pOutput_File, "Attribute: Regular\n");
++    
++    int record_count = 0;
++    for(i = 0 ; i < SAS_FUNC_NUM + NAS_FUNC_NUM ; i++)
++    {
++        if(dinfo[i].len <= 0)
++        {
++            continue;
++        }
++        record_count += 1;
++    }
++    fprintf(pOutput_File, "No. of Records: %d\n", record_count);
++
++    cnt = 1;
++    disk_data_offset = DISK_SAS_DATA_PACKAGE_HEADER_SIZE;
++    for(i = 0 ; i < SAS_FUNC_NUM + NAS_FUNC_NUM ; i++)
++    {
++        if(dinfo[i].len <= 0)
++        {
++            continue;
++        }
++        fprintf(pOutput_File, "Record %d byte index: %d\n", cnt, disk_data_offset);
++        fprintf(pOutput_File, "Record %d length: %d\n", cnt, dinfo[i].len);
++        fprintf(pOutput_File, "Record %d template: %03d\n", cnt, dinfo[i].temp_num);
++        disk_data_offset += dinfo[i].len;
++        cnt++;
++    }
++    fprintf(pOutput_File, "END");
++    fclose(pOutput_File);
++}
++
++void copy_file_byfd(int fd, char *spath)
++{
++    int cnt = 0;
++    char buf[8192];
++
++    int sfd = open(spath, O_RDONLY, 0644);
++    cnt = read(sfd, buf, 8192);
++    while(cnt > 0)
++    {
++        write(fd, buf, cnt);
++        cnt = read(sfd, buf, 8192);
++    }
++    close(sfd);
++}
++
++void combine_head_data(char *hpath, char *spath, char *tpath)
++{
++    int hfd, sfd, tfd;
++    int i; 
++    char *arr[2] = {spath, tpath};
++
++    printf("head file:%s, data file:%s, %s\n", hpath, arr[0], arr[1]);
++    hfd = open(hpath, O_CREAT | O_WRONLY, 0644);
++    lseek(hfd, DISK_SAS_DATA_PACKAGE_HEADER_SIZE, SEEK_CUR);
++
++    for(i = 0 ; i < 2 ; i++)
++    {
++       copy_file_byfd(hfd, arr[i]); 
++    }
++    close(hfd);
++}
++
++int da_sas(struct paras_in paras)
++{
++    PD_INFO pd_info;
++    struct datainfo dinfo[SAS_FUNC_NUM + NAS_FUNC_NUM];
++    char sas_path[256] = {0};
++    char nas_path[256] = {0};
++    char head_path[256] = {0};
++
++    if (PD_Get_Info(paras.enc_id, paras.port_id, &pd_info) < 0)
++    {       
++        printf("da_sas: can not get pd info\n");
++        return -1;
++    }
++
++    printf("(%s : %s)\n", pd_info.pd_sys_name, pd_info.serial_no); 
++    memset(dinfo, 0, sizeof(struct datainfo) * SAS_FUNC_NUM);
++
++    da_gen_sas_data_file(pd_info.pd_sys_name, paras.enc_id, paras.port_id, dinfo, sas_path);
++    da_gen_nas_data_file(paras.enc_id, paras.port_id, dinfo, nas_path, SAS_FUNC_NUM);
++    da_gen_sas_header(dinfo, paras.enc_id, paras.port_id, head_path);
++    dump_datainfo(dinfo);
++
++    combine_head_data(head_path, sas_path, nas_path);
++    return 0;
++    
++}
++
++/*
++int main(int argc, char * argv[])
++{
++    if (2 != argc) {
++        printf("Usage: 'sg_simple0 <sg_device>'\n");
++        return 1;
++    }
++    int sg_fd;
++
++    if ((sg_fd = open(argv[1], O_RDONLY)) < 0) {
++        perror("error opening given file name");
++    }
++
++    da_gen_sas_data_file(sg_fd, 0, 1); //enc_id, port_id
++    close(sg_fd);
++    return 0;
++}
++*/
+diff --git a/NasUtil/da_util/da_sas.h b/NasUtil/da_util/da_sas.h
+new file mode 100644
+index 00000000000..140de07c62d
+--- /dev/null
++++ b/NasUtil/da_util/da_sas.h
+@@ -0,0 +1,150 @@
++#include <sys/ioctl.h>
++#include <scsi/sg.h> /* take care: fetches glibc's /usr/include/scsi/sg.h */
++
++
++#define PAGE_LEN_COMB(v1, v2) (((v1 & 0xff) << 8) | (v2 & 0xff))
++#define DEFECT12_LEN_COMB(v1, v2, v3, v4) (((v1 & 0xff) << 24) | ((v2 & 0xff) << 16) | ((v3 & 0xff) << 8) | (v4 & 0xff))
++
++
++#define INQ_REPLY_LEN 8192
++#define INQ_CMD_CODE 0x12
++#define INQ_CMD_LEN 6
++
++#define LOG_SENSE_REPLY_LEN 65535
++#define LOG_SENSE_SUPPORT_REPLAY_LEN 256
++#define LOG_SENSE_CMD_CODE 0x4D
++#define LOG_SENSE_CMD_LEN 10
++
++#define READ_CAPACITY_10_CMD_LEN 10
++#define READ_CAPACITY_10_REPLY_LEN 8
++#define READ_CAPACITY_10 0x25
++
++#define READ_CAPACITY_16_CMD_LEN 16
++#define READ_CAPACITY_16_REPLY_LEN 32
++#define READ_CAPACITY_16 0x9E
++
++#define READ_DEFECT_DATA_12_CMD_LEN 12
++#define READ_DEFECT_DATA_12_REPLY_LEN 8
++#define READ_DEFECT_DATA_12 0xB7
++#define READ_DEFECT_DATA_12_GLIST 0x0c
++#define READ_DEFECT_DATA_12_PLIST 0x14
++#define READ_DEFECT_DATA_12_BUFFER 131072 /* 128kb */
++
++#define VPD_PAGE_Unit_Serial_Number 0x80
++#define VPD_PAGE_Device_Identification 0x83
++#define VPD_PAGE_Extended_INQUIRY_Data 0x86
++#define VPD_PAGE_Mode_Page_Policy 0x87
++#define VPD_PAGE_SCSI_Ports 0x88
++#define VPD_PAGE_Protocol_Specific_Logical_Unit_Information 0x90
++#define VPD_PAGE_Protocol_Specific_Port_Information 0x91
++#define VPD_PAGE_Block_Limits 0xb0
++#define VPD_PAGE_Block_Device_Characteristics 0xb1
++#define PAGE_CODE_WRITE_ERROR_COUNTER   0x02
++#define PAGE_CODE_READ_ERROR_COUNTER   0x03
++#define PAGE_CODE_VERIFY_ERROR_COUNTER   0x05
++#define PAGE_CODE_NON_MEDIUM_ERROR   0x06
++#define PAGE_CODE_FORMAT_STATUS   0X08
++#define PAGE_CODE_TEMPERATURE   0X0D
++#define PAGE_CODE_START_STOP_CYCLE_COUNTER   0X0E
++#define PAGE_CODE_APPLICATION_CLIENT   0X0F
++#define PAGE_CODE_SELF_TEST_RESULT   0X10
++#define PAGE_CODE_SOLID_STATE_MEDIA   0X11
++#define PAGE_CODE_BACKGROUND_SCAN_RESULTS   0X15
++#define PAGE_CODE_NON_VOLATILE_CACHE   0X17
++#define PAGE_CODE_PROTOCOL_SPECIFIC_PORT   0X18
++#define PAGE_CODE_GENERAL_STATISTICS_AND_PERFORMANCE   0X19
++#define PAGE_CODE_INFORMATIONAL_EXCEPTIONS   0X2F
++
++struct scsi_paras {
++    char *buf;
++    int buf_len;
++    unsigned char *cmd;
++    int cmd_len;
++};
++
++struct datainfo {
++    int len;
++    int temp_num;
++    unsigned char op;
++};
++
++struct sasfunc {
++    unsigned char opcode;
++    int temp_num;
++    int (*func)(int sg_fd, unsigned char op, int data_fd); 
++};
++
++int send_log_sense_command(int sg_fd, unsigned char op, int data_fd);
++int send_inquiry_vpd_command(int sg_fd, unsigned char op, int data_fd);
++int send_read_capacity_10(int sg_fd, unsigned char op, int data_fd);
++int send_read_capacity_16(int sg_fd, unsigned char op, int data_fd);
++int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd);
++int send_read_defect_data_12(int sg_fd, unsigned char op, int data_fd);
++int send_standard_inquiry_command(int sg_fd, unsigned char op, int data_fd);
++
++#define SAS_FUNC_NUM 29
++
++struct sasfunc funcs[SAS_FUNC_NUM] = {
++    {PAGE_CODE_WRITE_ERROR_COUNTER, 301, send_log_sense_command},
++    {PAGE_CODE_READ_ERROR_COUNTER, 302, send_log_sense_command},
++    {PAGE_CODE_VERIFY_ERROR_COUNTER, 303, send_log_sense_command},
++    {PAGE_CODE_NON_MEDIUM_ERROR, 304, send_log_sense_command},
++    {PAGE_CODE_FORMAT_STATUS, 305, send_log_sense_command},
++    {PAGE_CODE_TEMPERATURE, 306, send_log_sense_command},
++    {PAGE_CODE_START_STOP_CYCLE_COUNTER, 307, send_log_sense_command},
++    {PAGE_CODE_APPLICATION_CLIENT, 308, send_log_sense_command},
++    {PAGE_CODE_SELF_TEST_RESULT, 309, send_log_sense_command},
++    {PAGE_CODE_SOLID_STATE_MEDIA, 310, send_log_sense_command},
++    {PAGE_CODE_BACKGROUND_SCAN_RESULTS, 311, send_log_sense_command},
++    {PAGE_CODE_NON_VOLATILE_CACHE, 312, send_log_sense_command},
++    {PAGE_CODE_PROTOCOL_SPECIFIC_PORT, 313, send_log_sense_command},
++    {PAGE_CODE_GENERAL_STATISTICS_AND_PERFORMANCE, 314, send_log_sense_command},
++    {PAGE_CODE_INFORMATIONAL_EXCEPTIONS, 315, send_log_sense_command},
++    {VPD_PAGE_Unit_Serial_Number, 320, send_inquiry_vpd_command},
++    {VPD_PAGE_Device_Identification, 321, send_inquiry_vpd_command},
++    {VPD_PAGE_Extended_INQUIRY_Data, 322, send_inquiry_vpd_command},
++    {VPD_PAGE_Mode_Page_Policy, 323, send_inquiry_vpd_command},
++    {VPD_PAGE_SCSI_Ports, 324, send_inquiry_vpd_command},
++    {VPD_PAGE_Protocol_Specific_Logical_Unit_Information, 325, send_inquiry_vpd_command},
++    {VPD_PAGE_Protocol_Specific_Port_Information, 326, send_inquiry_vpd_command},
++    {VPD_PAGE_Block_Limits, 327, send_inquiry_vpd_command},
++    {VPD_PAGE_Block_Device_Characteristics, 328, send_inquiry_vpd_command},
++    {READ_CAPACITY_10, 330, send_read_capacity_10},
++    {READ_CAPACITY_16, 331, send_read_capacity_16},
++    {READ_DEFECT_DATA_12_GLIST, 332, send_read_defect_data_12},
++    {READ_DEFECT_DATA_12_PLIST, 333, send_read_defect_data_12},
++    {INQ_CMD_CODE, 334, send_standard_inquiry_command},
++};
++
++struct nas_paras {
++    int enc_id;
++    int port_id;
++    int data_fd;
++};
++
++struct nasfunc {
++    unsigned char opcode;
++    int temp_num;
++    int (*func)(unsigned char op, struct nas_paras *paras); 
++};
++
++#define NAS_RAID_INFO 203
++#define NAS_FUNC_NUM 1
++
++int read_raid_info(unsigned char op, struct nas_paras *paras);
++
++struct nasfunc nasfuncs[NAS_FUNC_NUM] = {
++    {NAS_RAID_INFO, 203, read_raid_info},
++};
++
++
++int len_sup_pages = 0;
++unsigned char *sup_pages;
++
++int len_sup_vpds = 0;
++unsigned char *sup_vpds;
++
++
++#define MAX_BUF_LEN 64
++#define MAX_CMD_LEN 256
++#define DISK_SAS_DATA_PACKAGE_HEADER_SIZE 2560
+diff --git a/NasUtil/da_util/da_system.c b/NasUtil/da_util/da_system.c
+new file mode 100644
+index 00000000000..1a7d49dd9c5
+--- /dev/null
++++ b/NasUtil/da_util/da_system.c
+@@ -0,0 +1,165 @@
++#include "da_util.h"
++#include "storage_man.h"
++
++/*
++int test_get_raid_info(int enc_id, int port_id, Storage_Raid_Info *raid_info)
++{
++    raid_info->group_id = 1;
++    raid_info->type = 1;
++    raid_info->capacity = 100;
++    raid_info->status = 0;
++    return 0;
++}
++*/
++
++void write_data_to_buffer(char *blob, void *value, int size, int *offset)
++{
++    int i = *offset;
++    if(size == 8)
++    {
++        unsigned long long *ivalue = (unsigned long long*)value;
++        blob[i] = (*ivalue) & 0xFF;
++        blob[i + 1] = (*ivalue >> 8) & 0xFF;
++        blob[i + 2] = (*ivalue >> 16) & 0xFF;
++        blob[i + 3] = (*ivalue >> 24) & 0xFF;
++        blob[i + 4] = (*ivalue >> 32) & 0xFF;
++        blob[i + 5] = (*ivalue >> 40) & 0xFF;
++        blob[i + 6] = (*ivalue >> 48) & 0xFF;
++        blob[i + 7] = (*ivalue >> 56) & 0xFF;
++    }
++    else if(size == 4)
++    {
++        unsigned int *ivalue = (unsigned int*)value;
++        blob[i] = (*ivalue) & 0xFF;
++        blob[i + 1] = (*ivalue >> 8) & 0xFF;
++        blob[i + 2] = (*ivalue >> 16) & 0xFF;
++        blob[i + 3] = (*ivalue >> 24) & 0xFF;
++    }
++    else if(size == 2)
++    {
++        unsigned short int *ivalue = (unsigned short int*)value;
++        blob[i] = (*ivalue) & 0xFF;
++        blob[i + 1] = (*ivalue >> 8) & 0xFF;
++    }
++
++    else if(size == 1)
++    {
++        unsigned char *ivalue = (unsigned char*)value;
++        blob[i] = (*ivalue) & 0xFF;
++    }
++    *offset += size;
++}
++
++int dump_buffer_to_file(char *fpath, char *blob)
++{
++     int ret;
++     int i;
++     int fd = open(fpath, O_CREAT | O_WRONLY, 0644);
++     ret = write(fd, blob, ULINK_TEMPLATE_SIZE);
++     close(fd);
++     return ret;
++}
++
++/*
++int raid_info_dump_to_buffer(RAID_DA_Template *raid_info, char *blob)
++{
++    int offset = 0;
++    int temp = 203, rev = 100, cnt = 4, size = 512;
++     
++    write_data_to_buffer(blob, &temp, 2, &offset);
++    write_data_to_buffer(blob, &rev, 2, &offset);
++    write_data_to_buffer(blob, &cnt, 2, &offset);
++    write_data_to_buffer(blob, &size, 2, &offset);
++    offset += 8;
++
++    write_data_to_buffer(blob, &(raid_info->group_id), 2, &offset);
++    write_data_to_buffer(blob, &(raid_info->type), 2, &offset);
++    write_data_to_buffer(blob, &(raid_info->capacity), 8, &offset);
++    write_data_to_buffer(blob, &(raid_info->status), 2, &offset);
++    
++    return 0;
++}
++*/
++
++int _da_system_raid_info(int enc_id, int port_id, char *blob)
++{
++    return -1;
++    /*
++    RAID_DA_Template raid_info;
++    int ret;
++
++    ret = NAS_RAID_Get_DA_Template(enc_id, port_id, &raid_info); 
++    if(ret != 0)
++    {
++        fprintf(stderr, "%s(%d) Fail to get raid info (%d, %d)\n", __func__, __LINE__, enc_id, port_id);
++        return -1;
++    }
++    ret = raid_info_dump_to_buffer(&raid_info, blob); 
++    if (ret != 0)
++    {
++        printf("Fail to dump data to buffer\n", enc_id, port_id);
++    }
++    
++    return ULINK_TEMPLATE_SIZE;
++    */
++    
++}
++
++int da_system_raid_info(struct paras_in paras)
++{
++    int ret;
++    char blob[ULINK_TEMPLATE_SIZE] = {0};
++    char fpath[128] = {0};
++    
++    ret =  _da_system_raid_info(paras.enc_id, paras.port_id, blob);
++    if(ret < 0)
++    {
++       printf("%d,Cannot get raid info\n", ret);
++       return ret;
++    }
++
++    sprintf(fpath, "/tmp/raid_info_%d_%d", paras.enc_id, paras.port_id);
++    ret = dump_buffer_to_file(fpath, blob);
++    if (ret == -1)
++    {
++        printf("999,Cannot dump raid info\n");
++        return 999;
++    }
++    printf("0,%s\n", fpath);
++    return 0;
++}
++
++int da_system_reset_cnt(struct paras_in paras)
++{
++    char *path = NAS_DISK_DATA_LOCATION;
++    struct dirent *de;
++    DIR *dr = opendir(path);
++    char buf[512] = {0};
++
++    if (dr == NULL)
++    {
++        printf("Could not open current directory" );
++        return 0;
++    }
++
++    while ((de = readdir(dr)) != NULL)
++    {
++        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
++        {
++            continue;
++        }
++        sprintf(buf, "%s/%s", path, de->d_name);
++        printf("remove file: %s\n", buf);
++        unlink(buf);
++    }
++
++    closedir(dr);
++    return 0;
++}
++
++
++
++
++
++
++
+diff --git a/NasUtil/da_util/da_util.c b/NasUtil/da_util/da_util.c
+new file mode 100644
+index 00000000000..ffb0eb4525f
+--- /dev/null
++++ b/NasUtil/da_util/da_util.c
+@@ -0,0 +1,97 @@
++#include "da_util.h"
++
++
++unsigned int parse_cmd_parms(cmd_param *param_ary, char *params)
++{
++    int i;
++    char *opt, *value;
++    char *opteq;
++
++    for (opt = strtok(params, ","); opt; opt = strtok(NULL, ","))
++    {
++        opteq = strchr(opt, '=');
++        if (opteq)
++        {
++            value = opteq + 1;
++            *opteq = '\0';
++
++            for (i = 0; param_ary[i].param_name != 0; i++)
++            {
++                if (!strcmp(param_ary[i].param_name, opt))
++                {
++                    param_ary[i].param_value = value;
++                }
++            }
++        }
++    }
++
++    return 0;
++}
++
++int call_function_by_index(int index)
++{
++    struct paras_in paras;
++
++    if(optarg)
++    {
++        parse_cmd_parms(param_ary, optarg);
++        if(param_ary[0].param_value != NULL)
++        {
++            paras.enc_id = atoi(param_ary[0].param_value);
++        }
++        if(param_ary[1].param_value != NULL)
++        {
++            paras.port_id = atoi(param_ary[1].param_value);
++        }
++        if(param_ary[2].param_value != NULL)
++        {
++            paras.value = param_ary[2].param_value;
++        }
++    }
++    return func_array[index].func(paras);
++}
++
++void init_options()
++{
++    int i;
++    int cnt = 0;
++
++    while (func_array[cnt].param[0] != '\0')
++    {
++        cnt += 1;
++    }
++    options = (struct option*)malloc(sizeof(struct option) * (cnt + 1));
++     
++    for(i = 0 ; i < cnt ; i++)
++    {
++        options[i].name = func_array[i].param;
++        options[i].has_arg = required_argument;
++        options[i].flag = NULL;
++        options[i].val = 0;
++        
++    }
++    options[cnt].name = 0;
++    options[cnt].has_arg = 0;
++    options[cnt].flag = 0;
++    options[cnt].val = 0;
++}
++
++int main(int argc, char *argv[])
++{
++    int ret = -1;
++    int index = -1;
++    
++    init_options();
++
++    while ((ret = getopt_long(argc, argv, "", options, &index)) >= 0)
++    {
++        if(ret != 0)
++        {
++            printf("option is not exist\n");
++            break;
++        }
++        ret = call_function_by_index(index);
++    }
++    free(options);
++    return 0;
++}
+diff --git a/NasUtil/da_util/da_util.h b/NasUtil/da_util/da_util.h
+new file mode 100644
+index 00000000000..748098d0259
+--- /dev/null
++++ b/NasUtil/da_util/da_util.h
+@@ -0,0 +1,68 @@
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <getopt.h>
++#include <dirent.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <errno.h>
++
++#include "hal.h"
++#include "hal_event.h"
++
++
++#define ULINK_TEMPLATE_SIZE 512
++
++struct option *options;
++
++typedef struct _cmd_param {
++    const char *param_name;
++    char *param_value;
++} cmd_param;
++
++struct paras_in {
++    int enc_id;
++    int port_id;
++    char *value;
++};
++
++static cmd_param param_ary[] =
++{
++    { "enc_id", NULL},
++    { "port_id", NULL},
++    { "value", NULL},
++    { NULL, NULL}
++};
++
++typedef int (*fobj) (struct paras_in);
++
++/*== start:function_declare_area  ==*/
++int da_iotest(struct paras_in);
++int da_sas(struct paras_in);
++int da_enable(struct paras_in);
++int da_enable_by_cfg(struct paras_in);
++int da_system_reset_cnt(struct paras_in);
++int da_system_raid_info(struct paras_in);
++
++/*== end:function_declare_area ==*/
++
++struct FuncStruct {
++    char param[256];
++    fobj func;
++};
++
++/*== start:function_para_area  ==*/
++static struct FuncStruct func_array[] = {
++
++    {"iotest", da_iotest},
++    {"sas", da_sas},
++    {"enable", da_enable},
++    {"enable_by_cfg", da_enable_by_cfg},
++    {"system_reset_cnt", da_system_reset_cnt},
++    {"system_raid_info", da_system_raid_info},
++    {"", NULL},
++};
++
++/*== end:function_para_area ==*/
++
+diff --git a/NasUtil/da_util/test_da_sas.py b/NasUtil/da_util/test_da_sas.py
+new file mode 100644
+index 00000000000..38e4630220f
+--- /dev/null
++++ b/NasUtil/da_util/test_da_sas.py
+@@ -0,0 +1,49 @@
++import os
++import sys
++
++
++def read_data(path, offset, length, tnum):
++    print offset, length, tnum, 
++    data = ""
++    with open(path, "r") as fr:
++        data = fr.read()
++
++    if tnum <= 315:
++        print length == 4 + (ord(data[offset + 2]) << 8) + ord(data[offset + 3])
++        return
++
++    if tnum <= 328:
++        print length == 4 + ord(data[offset + 3])
++        return
++        
++    if tnum == 330:
++        print length == 8 
++
++    if tnum == 331:
++        print length == 32
++
++    if tnum == 332 or tnum == 333:
++        print length,  8 + (ord(data[offset + 4]) << 24) + (ord(data[offset + 5]) << 16) + (ord(data[offset + 6])
++        << 8 ) + ord(data[offset + 7])
++
++    if tnum == 334:
++        print length,  8 + ord(data[offset + 4])
++
++def read_sas_header(path):
++    recs = []
++    with open(path, "r") as fr:
++        lines = fr.readlines()
++        for line in lines:
++            if "Record" in line and "Records" not in line:
++                recs.append(line.strip().split()[-1])
++    
++    for i in xrange(0, len(recs), 3):
++        read_data(path, int(recs[i]), int(recs[i + 1]), int(recs[i + 2]))
++        
++
++def main():
++    read_sas_header(sys.argv[1])
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/NasUtil/hal_util/hal_util.h b/NasUtil/hal_util/hal_util.h
+index edea83262c0..3f98c425ad3 100755
+--- a/NasUtil/hal_util/hal_util.h
++++ b/NasUtil/hal_util/hal_util.h
+@@ -758,3 +758,22 @@ typedef struct _translate_table
+ 
+ #endif
+ 
++/* SCSI CMD CODE for ULINK*/
++#define ULINK_READ_6				0x08
++#define ULINK_READ_10				0x28
++#define ULINK_READ_16				0x88
++
++#define ULINK_WRITE_6				0x0a
++#define ULINK_WRITE_10			0x2a
++#define ULINK_WRITE_16			0x8a
++#define ULINK_WRITE_SAME_16			0x93
++
++#define	ULINK_ATA_16		      0x85
++#define	ULINK_ATA_12		      0xa1
++
++#define ULINK_INQUIRY               0x12
++
++#define COMBINE_TWO_BYTES(b1, b2) ((b1 & 0xff) << 8) | (b2 & 0xff)
++#define COMBINE_FOUR_BYTES(b1, b2, b3, b4) (((b1 & 0xff) << 24) | ((b2 & 0xff) << 16) | ((b3 & 0xff) << 8) | (b4 & 0xff))
++#define GET_BIT_VALUE(v, p) ((v >> (p - 1)) & 0x01)   
++
+diff --git a/NasUtil/hal_util/hal_util_main.c b/NasUtil/hal_util/hal_util_main.c
+index 4cf3ad70c5a..fe8d9f144f5 100755
+--- a/NasUtil/hal_util/hal_util_main.c
++++ b/NasUtil/hal_util/hal_util_main.c
+@@ -2751,6 +2751,9 @@ int main(int argc, char** argv)
+     THREAD_INFO evt_monotor_thread_info;
+     void *exit = NULL;
+     int ret = -1;
++
++    system("/sbin/da_util --enable_by_cfg value=1");
++
+     if((ap_name = strrchr(argv[0], '/')) == NULL)
+         ap_name = argv[0];
+     else
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index 73b651d4d92..af992a996d7 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -78,6 +78,7 @@ extern pthread_mutex_t hal_util_mutex;
+ extern ENC_MONITOR_OBJ* se_add(int enc_id, time_t time_stamp);
+ extern int se_remove(int enc_id, time_t time_stamp);
+ extern int get_pd_highest_temp(ENC_MONITOR_OBJ *enc, int *pd_index, IN FAN_REGION region_idx);
++extern int PD_Inc_ATA_ErrCnt(char *sn, int tnum, int id);
+ 
+ typedef enum _SSD_LIFE_WARNING_LEVEL
+ {
+@@ -2800,6 +2801,355 @@ static int sg_get_type(char *dev_sys_id)
+     return -1;
+ }
+ 
++
++static void ataqc_err_dispatch(char *sn, unsigned char state, unsigned char err)
++{
++    if ((state & ATA_DRDY) != 1)
++        PD_Inc_ATA_ErrCnt(sn, 202, 1);
++
++    if (err) {
++        if (err & ATA_ICRC) 
++            PD_Inc_ATA_ErrCnt(sn, 16, 1);
++        if (err & ATA_UNC)  
++            PD_Inc_ATA_ErrCnt(sn, 16, 2);
++        if (err & ATA_IDNF) 
++            PD_Inc_ATA_ErrCnt(sn, 16, 3);
++        if (err & ATA_ABORTED)  
++            PD_Inc_ATA_ErrCnt(sn, 16, 4);
++        if (err & ATA_AMNF) 
++            PD_Inc_ATA_ErrCnt(sn, 16, 5);
++    }
++}
++
++static void atalink_err_dispatch(char *sn, unsigned int serror)
++{
++    if(serror)
++    {
++        if (serror & SERR_HANDSHAKE)
++            PD_Inc_ATA_ErrCnt(sn, 16, 6);
++        if (serror & SERR_CRC)
++            PD_Inc_ATA_ErrCnt(sn, 16, 7);
++        if (serror & SERR_DISPARITY)
++            PD_Inc_ATA_ErrCnt(sn, 16, 8);
++        if (serror & SERR_10B_8B_ERR)
++            PD_Inc_ATA_ErrCnt(sn, 16, 9);
++        if (serror & SERR_INTERNAL)
++            PD_Inc_ATA_ErrCnt(sn, 16, 10);
++        if (serror & SERR_PROTOCOL)
++            PD_Inc_ATA_ErrCnt(sn, 16, 11);
++        if (serror & SERR_PERSISTENT)
++            PD_Inc_ATA_ErrCnt(sn, 16, 12);
++        if (serror & SERR_DATA)
++            PD_Inc_ATA_ErrCnt(sn, 16, 13);
++        if (serror & SERR_COMM_RECOVERED)
++            PD_Inc_ATA_ErrCnt(sn, 16, 14);
++        if (serror & SERR_DATA_RECOVERED)
++            PD_Inc_ATA_ErrCnt(sn, 16, 15);
++    }
++}
++static void scsicmd_err_dispatch_retry(char *sn, int cmdtype)
++{
++    UTIL_Debug(TRACE_WARNING, "dispatch retry: %d\n", cmdtype);    
++
++    switch (cmdtype) {
++        case 0:
++            PD_Inc_ATA_ErrCnt(sn, 201, 1);
++            break;
++            
++        case 1:
++            PD_Inc_ATA_ErrCnt(sn, 201, 2);
++            break;
++
++        default:
++            PD_Inc_ATA_ErrCnt(sn, 201, 3);
++            break;
++    }
++}
++static void scsicmd_err_dispatch_fail(char *sn, int cmdtype)
++{
++    UTIL_Debug(TRACE_WARNING, "dispatch fail: %d\n", cmdtype);    
++
++    switch (cmdtype) {
++        case 0:
++            PD_Inc_ATA_ErrCnt(sn, 202, 3);
++            break;
++            
++        case 1:
++            PD_Inc_ATA_ErrCnt(sn, 202, 2);
++            break;
++
++        case 2:
++            PD_Inc_ATA_ErrCnt(sn, 202, 4);
++            break;
++        default:
++            PD_Inc_ATA_ErrCnt(sn, 202, 5);
++            break;
++    }
++}
++static void scsicmd_err_dispatch_latency(PD_INFO *pd_info, int cmdtype, int value, int transfer_size)
++{
++    char *sn = pd_info->serial_no;
++    int max_latency = 0;
++    if(cmdtype == 99)
++    {
++        return;
++    }
++	UTIL_Debug(TRACE_WARNING, "dispatch latency: %d, value = %d, transfer_size = %d\n", cmdtype, value, transfer_size); 
++    if((pd_info->capabilities & PD_CAP_SSD) == 0)
++    {
++        max_latency = 1000 + (transfer_size / 256) * 2;
++        if(value < max_latency)
++        {
++	        UTIL_Debug(TRACE_WARNING, "it doesn't over max latency : (value = %d, max_latency = %d)\n", value, max_latency); 
++            return;
++        }
++    }
++    switch (cmdtype) {
++        case 0:
++            PD_Inc_ATA_ErrCnt(sn, 201, 6);
++            break;
++        case 1:
++            PD_Inc_ATA_ErrCnt(sn, 201, 7);
++            break;
++        default:
++            break;
++    }
++}
++
++static void scsicmd_err_dispatch_timesout(char *sn, int cmdtype)
++{
++    UTIL_Debug(TRACE_WARNING, "dispatch timesout: %d\n", cmdtype);    
++    PD_Inc_ATA_ErrCnt(sn, 201, 10);
++}
++static int atacmd_type_dispatch(unsigned char tfcmd)
++{
++    int cmdtype = -1;
++
++    switch(tfcmd)
++    {
++        case ATA_CMD_READ_LONG:
++        case ATA_CMD_READ_LONG_ONCE:
++        case ATA_CMD_READ:
++        case ATA_CMD_READ_EXT:
++        case ATA_CMD_READ_QUEUED:
++        case ATA_CMD_FPDMA_READ:
++        case ATA_CMD_READ_MULTI:
++        case ATA_CMD_READ_MULTI_EXT:
++        case ATA_CMD_PIO_READ:
++        case ATA_CMD_PIO_READ_EXT:
++        case ATA_CMD_READ_STREAM_DMA_EXT:
++        case ATA_CMD_READ_STREAM_EXT:
++            cmdtype = 0;
++            break;
++
++        case ATA_CMD_WRITE_LONG:
++        case ATA_CMD_WRITE_LONG_ONCE:   
++        case ATA_CMD_CFA_WRITE_NE:
++        case ATA_CMD_CFA_WRITE_MULT_NE:
++        case ATA_CMD_WRITE:
++        case ATA_CMD_WRITE_EXT:
++        case ATA_CMD_WRITE_FUA_EXT:
++        case ATA_CMD_WRITE_QUEUED:
++        case ATA_CMD_WRITE_QUEUED_FUA_EXT:
++        case ATA_CMD_FPDMA_WRITE:
++        case ATA_CMD_WRITE_MULTI:
++        case ATA_CMD_WRITE_MULTI_EXT:
++        case ATA_CMD_WRITE_MULTI_FUA_EXT:
++        case ATA_CMD_PIO_WRITE:
++        case ATA_CMD_PIO_WRITE_EXT:
++        case ATA_CMD_WRITE_STREAM_DMA_EXT:
++        case ATA_CMD_WRITE_STREAM_EXT:
++            cmdtype = 1;
++            break;
++        case ATA_CMD_ID_ATA:
++            cmdtype = 2;
++            break;  
++        default:
++            cmdtype = 99;
++            break;
++    }
++    return cmdtype;
++    
++}
++
++
++
++static int get_ata_passthrough_16_transfer_size(PD_INFO *pd_info, unsigned char *scmd)
++{
++    int transfer_size;
++    int t_length = scmd[2] & 0x03;
++    UTIL_Debug(TRACE_WARNING, "get_ata_passthrough_16_transfer_size: %d\n", t_length);    
++    switch(t_length)
++    {
++        case 1:
++            transfer_size = COMBINE_TWO_BYTES(scmd[3], scmd[4]);
++            break;
++        case 2:
++            transfer_size = COMBINE_TWO_BYTES(scmd[5], scmd[6]);
++            break;
++        default:
++            return 0;
++            break;
++    }
++
++    if(GET_BIT_VALUE(scmd[2], 3) == 0)
++    {
++       return  transfer_size / 512;
++    }
++
++    UTIL_Debug(TRACE_WARNING, "get_ata_passthrough_16_transfer_size: test : %d\n", (transfer_size * pd_info->sector_size) / 512);    
++    if(GET_BIT_VALUE(scmd[2], 5) == 0)
++    {
++       return transfer_size;
++    }
++    else
++    {
++        return (transfer_size * pd_info->sector_size) / 512; 
++    }
++
++
++
++    
++    
++    
++}
++
++/*
++ * 0 --> READ
++ * 1 --> WRITE
++ * 2 --> IDENTIFY
++ * 99 --> OTHERS
++ */
++static int scsicmd_type_dispatch(PD_INFO *pd_info, unsigned char *scmd, int *transfer_size)
++{
++    unsigned char scsi_op = scmd[0];
++    int cmdtype = 99;
++
++    switch (scsi_op) {
++        case ULINK_READ_6: // obsolete
++            cmdtype = 0;
++            break;
++        case ULINK_READ_10:
++            cmdtype = 0;
++            *transfer_size = COMBINE_TWO_BYTES(scmd[7], scmd[8]);
++            break;
++        case ULINK_READ_16:
++            cmdtype = 0;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
++            break;
++            
++        case ULINK_WRITE_6: //obsolete
++            cmdtype = 1;
++            break;
++
++        case ULINK_WRITE_10:
++            cmdtype = 1;
++            *transfer_size = COMBINE_TWO_BYTES(scmd[7], scmd[8]);
++            break;
++            
++        case ULINK_WRITE_16:
++            cmdtype = 1;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
++            break;
++
++        case ULINK_WRITE_SAME_16: //Illegal Request - invalid/unsupported command code
++            cmdtype = 1;
++            *transfer_size = COMBINE_FOUR_BYTES(scmd[10], scmd[11], scmd[12], scmd[13]);
++            break;
++
++        case ULINK_ATA_16:
++            *transfer_size = get_ata_passthrough_16_transfer_size(pd_info, scmd);
++            cmdtype = atacmd_type_dispatch(scmd[14]);
++            break;
++        case ULINK_ATA_12:
++            *transfer_size = 0; // Max 255 blocks in ata pass through 12
++            cmdtype = atacmd_type_dispatch(scmd[9]);
++            break;  
++        case ULINK_INQUIRY:
++            switch (scmd[2]){
++                case 0x89:
++                    cmdtype = 2;
++                    break;
++            }       
++            break;
++        default:
++            break;
++    }
++    return cmdtype;
++}
++
++static void scsicmd_err_dispatch(PD_INFO *pd_info, int action, int value, unsigned char *scmd)
++{
++    char *sn = pd_info->serial_no;
++    int cmdtype = -1;
++    int transfer_size = 0;
++
++    cmdtype = scsicmd_type_dispatch(pd_info, scmd, &transfer_size);
++    if(action == 0)
++    {
++        scsicmd_err_dispatch_retry(sn, cmdtype);
++    }
++    else if (action == 1)
++    {
++        scsicmd_err_dispatch_fail(sn, cmdtype);
++    }
++    else if(action == 2)
++    {
++        scsicmd_err_dispatch_latency(pd_info, cmdtype, value, transfer_size);
++    }
++    else if(action == 3)
++    {
++        scsicmd_err_dispatch_timesout(sn, cmdtype);
++    }
++}
++static void atacmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct __netlink_pd_ata_qc_err *netlink_ata_qc)
++{
++    int ret;
++    PD_INFO pd_info;
++
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "atacmd error : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
++    UTIL_Debug(TRACE_WARNING, "atacmd error : (%s, %d, %d)\n", pd_info.serial_no, netlink_ata_qc->state, netlink_ata_qc->err);    
++    ataqc_err_dispatch(pd_info.serial_no, netlink_ata_qc->state, netlink_ata_qc->err);
++}
++static void atalink_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct __netlink_pd_ata_link_err *netlink_ata_link)
++{
++    int ret;
++    PD_INFO pd_info;
++
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "atalink link error : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
++    UTIL_Debug(TRACE_WARNING, "atalink link error : (%s, %d)\n", pd_info.serial_no, netlink_ata_link->serror);    
++    atalink_err_dispatch(pd_info.serial_no, netlink_ata_link->serror);
++}
++
++static void scsicmd_err_add_cnt(ENC_MONITOR_OBJ *enc, PD_MONITOR_OBJ *pd, struct __netlink_pd_scsi_cmd_err *netlink_scsi_cmd)
++{
++    int ret;
++    PD_INFO pd_info;
++
++    ret = PD_Get_Info(enc->enc_id, pd->port_id, &pd_info);
++    if(ret < 0)
++    {
++        UTIL_Debug(TRACE_WARNING, "scsicmd retry/error/latency : can not get pdinfo : (enc=%d, port=%d)\n", enc->enc_id, pd->port_id);    
++        return;
++    }
++    if(pd_info.type != PD_SATA)
++    {
++        return;
++    }
++    UTIL_Debug(TRACE_WARNING, "scsicmd retry/error/latency:(%s, %d, %x)\n", pd_info.serial_no, netlink_scsi_cmd->action, netlink_scsi_cmd->error_scsi_cmd[0]);    
++    scsicmd_err_dispatch(&pd_info, netlink_scsi_cmd->action, netlink_scsi_cmd->value, netlink_scsi_cmd->error_scsi_cmd);
++}
++
+ static int pd_evt_func(EVT_FUNC_ARG arg)
+ {
+     int enc_id, port_id, dev_id;
+@@ -2814,6 +3164,9 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+     char *dev_sys_id = NULL;
+     struct __netlink_pd_cb *netlink_pd = NULL;
+     struct __netlink_ncq_cb *netlink_ncq = NULL;
++    struct __netlink_pd_ata_qc_err *netlink_ata_qc = NULL;
++    struct __netlink_pd_scsi_cmd_err *netlink_scsi_cmd = NULL;
++    struct __netlink_pd_ata_link_err *netlink_ata_link = NULL;
+     int ret,retry= 0;
+     int find = 0;
+     time_t enc_time_stamp;
+@@ -4095,6 +4448,47 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+             }
+             pthread_mutex_unlock(&hal_util_mutex);
+             break;
++        case SET_PD_ATA_QC_ERROR:
++            pthread_mutex_lock(&hal_util_mutex);
++            netlink_ata_qc = &arg.param.netlink_pd_ata_qc_err;
++            ret = find_pd_from_scsi_bus(netlink_ata_qc->scsi_bus, &enc, &pd);
++            if(ret != 0){
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_ATA_QC_ERROR:can't find device\n", netlink_ata_qc->scsi_bus[0], netlink_ata_qc->scsi_bus[1], netlink_ata_qc->scsi_bus[3], netlink_ata_qc->scsi_bus[4]);    
++            } 
++            else
++            {
++                atacmd_err_add_cnt(enc, pd, netlink_ata_qc);
++            }
++            pthread_mutex_unlock(&hal_util_mutex);
++            break;  
++        case SET_PD_SCSI_CMD_ERROR:
++            pthread_mutex_lock(&hal_util_mutex);
++            netlink_scsi_cmd = &arg.param.netlink_pd_scsi_cmd_err;
++            ret = find_pd_from_scsi_bus(netlink_scsi_cmd->scsi_bus, &enc, &pd);
++            if(ret != 0)
++            {
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_scsi_cmd->scsi_bus[0], netlink_scsi_cmd->scsi_bus[1], netlink_scsi_cmd->scsi_bus[3], netlink_scsi_cmd->scsi_bus[4]);    
++            } 
++            else
++            {
++                scsicmd_err_add_cnt(enc, pd, netlink_scsi_cmd);
++            }
++            pthread_mutex_unlock(&hal_util_mutex);
++            break;  
++        case SET_PD_ATA_LINK_ERROR:
++            pthread_mutex_lock(&hal_util_mutex);
++            netlink_ata_link = &arg.param.netlink_pd_ata_link_err;
++            ret = find_pd_from_scsi_bus(netlink_ata_link->scsi_bus, &enc, &pd);
++            if(ret != 0)
++            {
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_ata_link->scsi_bus[0], netlink_ata_link->scsi_bus[1], netlink_ata_link->scsi_bus[3], netlink_ata_link->scsi_bus[4]);    
++            } 
++            else
++            {
++                atalink_err_add_cnt(enc, pd, netlink_ata_link);
++            }
++            pthread_mutex_unlock(&hal_util_mutex);
++            break;  
+         default:
+             UTIL_Debug(TRACE_WARNING, "Unknown action = 0x%x\n",arg.action);
+             break;
+diff --git a/RootFS/init.d_509/da_iotest.sh b/RootFS/init.d_509/da_iotest.sh
+new file mode 100644
+index 00000000000..f6b1fe65ee1
+--- /dev/null
++++ b/RootFS/init.d_509/da_iotest.sh
+@@ -0,0 +1,21 @@
++#!/bin/sh
++
++ENC_MAX_INTERNAL_ENCLOSURE_ID=30
++FILE_HAL_CONF="/etc/hal.conf"
++
++function get_max_port_num {
++    max_port_num=`getcfg -f $FILE_HAL_CONF "Enclosure_$enc_id" max_disk_num`
++    echo $max_port_num
++}
++
++for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
++{
++    if [ -f /etc/enclosure_$enc_id.conf ]; then
++        max_port_num=$(get_max_port_num)
++        for ((port_id=1;port_id<=$max_port_num;port_id++))
++        {
++            /sbin/da_util --iotest enc_id=$enc_id,port_id=$port_id  
++        }
++    fi
++}
++

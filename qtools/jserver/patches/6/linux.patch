@@ -13,10 +13,52 @@ index 6ea9320e311f..71faff270a8e 100644
  	if (host->eh_deadline != -1 && !host->last_reset)
  		host->last_reset = jiffies;
 diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-index 5d11f53b12d2..08d9d1ea934a 100644
+index 5d11f53b12d2..9593cb6f05a3 100644
 --- a/drivers/scsi/scsi_lib.c
 +++ b/drivers/scsi/scsi_lib.c
-@@ -1760,10 +1760,6 @@ static void scsi_softirq_done(struct request *rq)
+@@ -117,12 +117,8 @@ EXPORT_SYMBOL(max_wakeup_pd_num);
+ 
+ 
+ #if defined(CONFIG_MACH_QNAPTS)
+-/*
+- * action = 0 --> retry
+- * action = 1 --> fail
+- * action = 2 --> long latency
+- */
+-void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action)
++
++void scsi_cmd_issue_halevent2(struct scsi_cmnd *cmd, int action, int value)
+ {
+     struct scsi_device *sdev = cmd->device;
+     NETLINK_EVT hal_event;
+@@ -132,6 +128,7 @@ void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action)
+     hal_event.arg.action = SET_PD_SCSI_CMD_ERROR;
+     netlink_pd = &hal_event.arg.param.netlink_pd_scsi_cmd_err;
+     netlink_pd->action = action;
++    netlink_pd->value = value;
+     netlink_pd->scsi_bus[0] = sdev->host->host_no;
+     netlink_pd->scsi_bus[1] = sdev->channel;
+     netlink_pd->scsi_bus[2] = sdev->id;
+@@ -140,7 +137,18 @@ void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action)
+     send_hal_netlink(&hal_event);
+ }
+ 
++/*
++ * action = 0 --> retry
++ * action = 1 --> fail
++ * action = 2 --> long latency
++ */
++void scsi_cmd_issue_halevent(struct scsi_cmnd *cmd, int action)
++{
++    scsi_cmd_issue_halevent2(cmd, action, 0);
++}
++
+ EXPORT_SYMBOL(scsi_cmd_issue_halevent);
++
+ #endif
+ 
+ /*
+@@ -1760,10 +1768,6 @@ static void scsi_softirq_done(struct request *rq)
  	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
  	unsigned long wait_for = (cmd->allowed + 1) * rq->timeout;
  	int disposition;
@@ -27,18 +69,20 @@ index 5d11f53b12d2..08d9d1ea934a 100644
  
  	INIT_LIST_HEAD(&cmd->eh_entry);
  	
-@@ -1771,8 +1767,9 @@ static void scsi_softirq_done(struct request *rq)
+@@ -1771,9 +1775,10 @@ static void scsi_softirq_done(struct request *rq)
      
  	if(cmd->device->param_latency > 0)
  	{
 -        if ((now - rq->io_start_time_ns) >=  max_latency)
 +        if (jiffies_to_msecs(cmd->jiffies_latency) > cmd->device->param_latency)
          {
+-            scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_LONG_LATENCY);
 +            printk("%d, %9ph\n", cmd->jiffies_latency, cmd->cmnd);
-             scsi_cmd_issue_halevent(cmd, SCSI_CMD_HAL_LONG_LATENCY);
++            scsi_cmd_issue_halevent2(cmd, SCSI_CMD_HAL_LONG_LATENCY, jiffies_to_msecs(cmd->jiffies_latency));
          }
  	}
-@@ -1840,6 +1837,9 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+     
+@@ -1840,6 +1845,9 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
  	struct scsi_device *sdev = cmd->device;
  #endif
  
@@ -48,7 +92,7 @@ index 5d11f53b12d2..08d9d1ea934a 100644
  	atomic_inc(&cmd->device->iorequest_cnt);
  
  	/* check if the device is still usable */
-@@ -1990,8 +1990,12 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
+@@ -1990,8 +1998,12 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
   */
  static void scsi_done(struct scsi_cmnd *cmd)
  {
@@ -62,7 +106,7 @@ index 5d11f53b12d2..08d9d1ea934a 100644
  
  /*
 diff --git a/include/qnap/hal_event.h b/include/qnap/hal_event.h
-index 2d5aae9caf59..d899793e502a 100644
+index 2d5aae9caf59..91660844cc55 100644
 --- a/include/qnap/hal_event.h
 +++ b/include/qnap/hal_event.h
 @@ -161,6 +161,7 @@ typedef enum {
@@ -73,6 +117,14 @@ index 2d5aae9caf59..d899793e502a 100644
  } SCSI_CMD_HALTYPE;
  
  typedef struct
+@@ -268,6 +269,7 @@ typedef struct
+         struct __netlink_pd_scsi_cmd_err
+         {
+             int action; // retry = 0, fail = 1
++            int value; 
+             int scsi_bus[4];
+             unsigned char error_scsi_cmd[16];
+         } __attribute__ ((__packed__)) netlink_pd_scsi_cmd_err;
 diff --git a/include/scsi/scsi_cmnd.h b/include/scsi/scsi_cmnd.h
 index 7bc752fc98de..6627c1627c8d 100644
 --- a/include/scsi/scsi_cmnd.h
