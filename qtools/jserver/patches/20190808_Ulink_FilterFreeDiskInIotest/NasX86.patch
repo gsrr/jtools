@@ -1,0 +1,85 @@
+diff --git a/NasUtil/da_util/da_iotest.c b/NasUtil/da_util/da_iotest.c
+index 2d35a9765fe..ceafe253688 100644
+--- a/NasUtil/da_util/da_iotest.c
++++ b/NasUtil/da_util/da_iotest.c
+@@ -1,6 +1,6 @@
+ #include "da_util.h"
+ #include "da_iotest.h"
+-
++#include "da_log.h"
+ 
+ int fio_popen(char *cmd, char *buf)
+ {
+@@ -35,6 +35,29 @@ unsigned int fio_parse(char *buf, int pos)
+     return ret;
+ }
+ 
++void fio_set_unsupport_val(char *sn)
++{
++    int fd;
++    int i;
++    int paras[4][2] = {
++        {201, 4},  //IOPS
++        {201, 5}, 
++        {201, 8},  //MBPS
++        {201, 9}, 
++    };
++
++    for(i = 0 ; i < 4 ; i++)
++    {
++        fd = get_filelock(sn);
++        if(fd == -1)
++        {
++            continue;
++        }
++        PD_Set_ATA_IOTest_Val(sn, paras[i][0], paras[i][1], 0xffffffff);
++        release_filelock(fd, sn);
++    }
++}
++
+ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long long length)
+ {
+     char buf[1024] = {0};
+@@ -42,20 +65,20 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+     int fd;
+     unsigned int val = 0;
+ 
+-    struct ulink_iotest_param params[2] = {
++    struct ulink_iotest_param params[4] = {
+         { "randread", 4, 7, 201, 4, 1 },  //IOPS
+-        //{ "randwrite", 4, 48, 201, 5, 1 }, 
++        { "randwrite", 4, 48, 201, 5, 1 }, 
+         { "read", 128, 6, 201, 8, 1000 },  //MBPS
+-        //{ "write", 128, 47, 201, 9, 1000 }, 
++        { "write", 128, 47, 201, 9, 1000 }, 
+     };
+         
+     char cmd[1024] = {0};
+     int i;
+-    for(i = 0 ; i < 2 ; i++)
++    for(i = 0 ; i < 4 ; i++)
+     {
+         sprintf(cmd, "python /usr/local/bin/da_util.pyc fiotest \"fio --name=%s --iodepth=32 --rw=%s --bs=%dK --direct=1 --runtime=10 --terse-version=3 --output-format=terse --time_based --offset=%llu --size=%llu\"", 
+             devname, params[i].ioname, params[i].bw, begin, length);
+-        printf("%s\n", cmd);
++        da_debug_log(TRACE_INFO, "%s\n", cmd);
+         ret = fio_popen(cmd, buf);
+         if(ret < 0)
+         {
+@@ -63,7 +86,7 @@ void fio_iotest(char *sn, char *devname, unsigned long long begin, unsigned long
+         }
+         // set template value;
+         val = fio_parse(buf, params[i].pos_fio);
+-        printf("%s = (%s, %d)\n", sn, params[i].ioname, val);
++        da_debug_log(TRACE_INFO, "%s = (%s, %d)\n", sn, params[i].ioname, val);
+         fd = get_filelock(sn);
+         if(fd == -1)
+         {
+@@ -98,5 +121,7 @@ int da_iotest(struct paras_in paras)
+     printf("(ret = %d, %s : %s : %s : %d : %d)\n", ret, pd_info.pd_sys_name, pd_info.serial_no, devname, begin, length); 
+     if(ret == 0)
+         fio_iotest(pd_info.serial_no, devname, begin, length);
++    else
++        fio_set_unsupport_val(pd_info.serial_no);
+     return 0;
+ }

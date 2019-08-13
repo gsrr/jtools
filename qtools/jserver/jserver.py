@@ -1,14 +1,16 @@
 import time
 import sys
 import socket
-import configparser
 import os
 import glob
 import xml.etree.cElementTree as ET
 import subprocess
+from jlib import jconf 
 
-gconfig = configparser.ConfigParser()
-gconfig.read('/etc/jserver.conf')
+
+def get_patch_path():
+    local = jconf.get_local()
+    return '%s/patches/%s'%(local['jserver_path'], sys.argv[2])
 
 def check_port(port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,13 +77,12 @@ def rm_redund_mnt():
         os.rmdir(m)
 
 def init():
-    global gconfig
-    config = gconfig
-    for section in config.sections():
-        hosts = config[section]['host'].split(",")
-        for host in hosts:
-            print (section, host.strip())
-            init_remote_client(host.strip(), config[section])
+    gconf = jconf.gconfig
+    for section in gconf.sections():
+        if section == "local":
+            continue
+        host = gconf[section]['host']
+        init_remote_client(host.strip(), gconf[section])
     rm_redund_mnt()
 
 def get_start_end_commid(repo):
@@ -97,8 +98,8 @@ def gen_patch_cmd(repo):
 
 # python3 gen_commit_patch 1 (1 stands for bug number)
 def gen_commit_patch():
-    global gconfig
-    fpath = '%s/patches/%s'%(gconfig['basic']['jserver_path'], sys.argv[2])
+    lconfig = jconf.get_local()
+    fpath = '%s/patches/%s'%(lconfig['jserver_path'], sys.argv[2])
     tree = ET.ElementTree(file='%s/manifest'%fpath)
     root = tree.getroot()
     src = root.attrib['src']
@@ -136,8 +137,8 @@ def do_commit_patch():
     pass
 
 def read_manifest():
-    global gconfig
-    fpath = '%s/patches/%s'%(gconfig['basic']['jserver_path'], sys.argv[2])
+    local = jconf.get_local()
+    fpath = '%s/patches/%s'%(local['jserver_path'], sys.argv[2])
     tree = ET.ElementTree(file='%s/manifest'%fpath)
     root = tree.getroot()
     return root
@@ -190,10 +191,9 @@ def dump_dic_to_file(dst, cfg):
 
 @decor_gen_commit_msg
 def gen_commit_msg(name, files):
-    ppath = os.path.abspath('patches/%s'%sys.argv[2])
-    msg_cfg = read_file("%s/README"%ppath)
+    msg_cfg = read_file("%s/README"%get_patch_path())
     msg_cfg['related files'] = files
-    dump_dic_to_file("%s/%s.msg"%(ppath, name), msg_cfg)
+    dump_dic_to_file("%s/%s.msg"%(get_patch_path(), name), msg_cfg)
 
 def gen_new_number():
     base_num = int(sys.argv[2])
@@ -209,9 +209,8 @@ def gen_new_number():
 
 # patch -p1 -i ../CVE-2015-1038.patch
 def exec_patch():
-    global gconfig
-    bconfig = gconfig['basic']
-    lconfig = gconfig['build_server']
+    bconfig = jconf.get_local()
+    lconfig = jconf.get_build_server()
     root = read_manifest()
     for proj in root:
         cmd = "patch -p1 -i %s -d %s"
@@ -224,9 +223,8 @@ def exec_patch():
 
 # patch -R -p1 -i ../CVE-2015-1038.patch
 def reverse_patch():
-    global gconfig
-    bconfig = gconfig['basic']
-    lconfig = gconfig['build_server']
+    bconfig = jconf.get_local()
+    lconfig = jconf.get_build_server()
     root = read_manifest()
     for proj in root:
         cmd = "patch -R -p1 -i %s -d %s"

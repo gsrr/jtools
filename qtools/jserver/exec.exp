@@ -1,11 +1,11 @@
 #!/usr/bin/expect
 set timeout -1
 set arg1 [lindex $argv 0]
-spawn ssh-copy-id root@172.17.22.47
+spawn ssh-copy-id root@172.17.22.179
 match_max 100000
 expect {
 	"*?assword:*" {
-		send -- "root0119\r"
+		send -- "jerrieisme\r"
 		exp_continue
 	}
 	"*?(yes/no)*" {

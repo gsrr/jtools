@@ -1,0 +1,16 @@
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index b5c3f185df1..18e3a6268ae 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -15513,9 +15513,9 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         }
+ 
+         if (pd_sys_get_nvme_selftest_logs(pd_sys_id, &nvme_self_test_log) == 0) {
+-            datainfo[4].len = 560;
++            datainfo[4].len = 564;
+             datainfo[4].temp_num = 101 + TEMPLATE_NVME_SELF_TEST;
+-            da_dump_data_to_file(nvme_out_file, datainfo[4], &nvme_self_test_log.result);
++            da_dump_data_to_file(nvme_out_file, datainfo[4], &nvme_self_test_log);
+         }
+ 
+         if (da_util_get_raid_info(enc_id, port_id, blob) == 0) {

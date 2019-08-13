@@ -2,8 +2,16 @@
 
 import os
 import git
+import xml.etree.cElementTree as ET
 
 patches_dir = '/datapool/qtools/jserver/patches/'
+
+
+def update_manifest(branch, manifest):
+    tree = ET.ElementTree(file='%s/manifest'%fpath)
+    root = tree.getroot()
+     
+
 
 def main():
     repo = git.Repo.init(path='.')
@@ -27,6 +35,7 @@ def main():
     os.system("cp %s %s"%(readme_src, readme_dst))
     os.system("cp %s %s"%(manifest_src, manifest_dst))
     print patch_dir
+    update_manifest(branch_name, manifest_dst)
     
 
 if __name__ == "__main__":

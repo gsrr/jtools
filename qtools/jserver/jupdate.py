@@ -4,6 +4,8 @@ import diskinfo
 import time
 import traceback
 
+from jlib import jconf
+
 global gloc
 
 def exec_remote_cmd(user, ip, cmd):
@@ -13,7 +15,7 @@ def exec_remote_cmd(user, ip, cmd):
 
 def exec_cmd(cmd):
     print (cmd)
-    os.system(cmd)
+    return os.system(cmd)
 
 def _mount_dom(user, ip):
     global gloc
@@ -37,20 +39,21 @@ def _mount_dom(user, ip):
         time.sleep(1)
 
 def mount_dom():
-    user = sys.argv[1] 
-    ip = sys.argv[2] 
-    _mount_dom(user, ip)
+    qts = jconf.get_qts()
+    _mount_dom(qts['user'], qts['host'])
     return 0
 
 def _do_update_kernel(model, source, dst):
     global gloc
+    ret = -1
     source = source + "/NasX86/Model/%s"%(model)
     for i in [2, 3]:
         for name in ['bzImage', 'bzImage.cksum']:
             tsrc = source + "/build/" + name
             tdst = dst + "/root/%s/%d/boot/%s"%(gloc, i, name)
             cmd = "rsync %s %s"%(tsrc, tdst)
-            exec_cmd(cmd)
+            ret = exec_cmd(cmd)
+    return ret
 
 def initrd_backup(path):
     size = os.path.getsize(path)/10**6
@@ -121,19 +124,24 @@ def _do_update(model, source, dst, items):
             print ("Fail to _do_update")
             break
 
-def do_update():
+def do_update(items):
     #_do_update("TS-X71", "/mnt_172.17.22.179/home/root/working/jerry_alpha/", "/mnt_172.17.22.121/", ["kernel"])
-    return _do_update("TS-X71", "/mnt_172.17.22.179/home/root/working/jerry_alpha_test/", "/mnt_172.17.22.206/", ["hal"])
+    #return _do_update("TS-X71", "/mnt_172.17.22.179/home/root/working/jerry_alpha_test/", "/mnt_172.17.22.206/", ["hal"])
+    qts = jconf.get_qts()
+    bs = jconf.get_build_server()
+    return _do_update(qts['model'], "/mnt_%s/%s/%s/"%(bs['host'], bs['working_dir'], bs['build_dir']), "/mnt_%s/"%(qts['host']), items)
 
 def main():
+    options = ["kernel", "hal", "hal_util"]
+    opts = raw_input(",".join(options))
+    
+    mount_dom()
     cmds = [
-        'mount_dom',
         'do_update',
     ]
     for cmd in cmds:
-        print("[%s]"%cmd)
         func = getattr(sys.modules[__name__], cmd)
-        ret = func()
+        ret = func(opts.split(","))
         if ret != 0:
             break
 
