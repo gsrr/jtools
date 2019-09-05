@@ -17,10 +17,15 @@ def exec_cmd(cmd):
     print (cmd)
     return os.system(cmd)
 
+def get_dom_dev(devs):
+    if len(devs) > 0:
+        return devs[0]
+    return raw_input("Can not find dom device, input manually:")
+
 def _mount_dom(user, ip):
     global gloc
     diskinfo.remote_get_diskinfo(user, ip)
-    dom = diskinfo.gdiskinfo['dom'][0]
+    dom = get_dom_dev(diskinfo.gdiskinfo['dom'])
     cnt = 0
     while True:
         try:
@@ -131,10 +136,21 @@ def do_update(items):
     bs = jconf.get_build_server()
     return _do_update(qts['model'], "/mnt_%s/%s/%s/"%(bs['host'], bs['working_dir'], bs['build_dir']), "/mnt_%s/"%(qts['host']), items)
 
+def get_opts(options):
+    ret = []
+    for i in xrange(len(options)):
+        print i + 1, ":", options[i]
+
+    opts = raw_input("Please enter your option (ex: 1,2,3) :")
+    for opt in opts.split(","):
+        opt = opt.strip()
+        ret.append(options[int(opt) - 1])
+    return ",".join(ret)
+    
+
 def main():
     options = ["kernel", "hal", "hal_util"]
-    opts = raw_input(",".join(options))
-    
+    opts = get_opts(options)
     mount_dom()
     cmds = [
         'do_update',
