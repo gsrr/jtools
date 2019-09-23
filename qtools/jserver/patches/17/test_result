@@ -1,0 +1,16 @@
+[SATA NOT Support]
+SDM: start predict enc = 0 port = 4 device
+SDM_Health_Predict:Start to predict sata disk
+estimate_ssd_life: (model, enc_id, port_id, per) = (PX-256M6Pro, 0, 4, 101)
+
+[QDA]
+SDM: start predict enc = 0 port = 3 device
+SDM_Health_Predict:Start to predict sata disk
+estimate_ssd_life: (enc_id, port_id) = (QDA-A2MAR JBOD, 0, 3) not support QDA
+
+[TR]
+SDM: enc = 1 is not internal.
+
+[HDD]
+estimate_ssd_life: (enc_id, port_id) = (0, 4) not support HDD
+

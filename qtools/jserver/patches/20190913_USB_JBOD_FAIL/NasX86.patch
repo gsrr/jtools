@@ -1,0 +1,101 @@
+diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
+index a0c5bd22e42..c1560cbaea7 100755
+--- a/NasLib/hal/hal_pd.c
++++ b/NasLib/hal/hal_pd.c
+@@ -425,7 +425,7 @@ void event_log(const char *format, ...)
+ 	lock_fd = Ini_Conf_Unlock_File(lock_fd);
+ }
+ 
+-int sed_is_support(IN char* pd_ctrl_name)// dev/sg*
++int _sed_is_support(IN char* pd_ctrl_name)// dev/sg*
+ {
+ 	int ret = -1;
+ 	//sighandler_t old_handler;
+@@ -535,6 +535,65 @@ out:
+ 	
+ }
+ 
++int get_enc_info_by_pd_ctrl_name(char* pd_ctrl_name, ENCLOSURE_INFO *enc_info)
++{
++    int enc_id_ary[MAX_SE_NUM];
++    int port_id_ary[MAX_PD_NUM];
++    int enc_num = 0;
++    int pd_num = 0;
++    int ret = -1;
++    int i;
++    int j;
++
++    enc_num = SE_Enumerate(enc_id_ary, MAX_SE_NUM, NULL, NULL);
++    for ( i = 0; i < enc_num; i++)
++    {
++        memset(enc_info, 0, sizeof(enc_info));
++        ret = SE_Get_Info(enc_id_ary[i], enc_info);
++        if(ret != 0)
++        {
++            continue;
++        }
++        pd_num = PD_Enumerate(enc_id_ary[i], port_id_ary, MAX_PD_NUM, NULL, NULL);
++        for (j = 0; j < pd_num; j++)
++        {
++            PD_INFO pd_info;
++            if (PD_Get_Info(enc_id_ary[i], port_id_ary[j], &pd_info) < 0)
++            {
++                continue;
++            }
++            if(strcmp(pd_info.pd_ctrl_name, pd_ctrl_name) == 0)
++            {
++                return 0;
++            }
++
++        }
++    }
++    return -1;
++
++
++}
++
++int sed_is_support(IN char* pd_ctrl_name)// dev/sg*
++{
++    ENCLOSURE_INFO enc_info;
++    int ret = -1;
++
++    ret = get_enc_info_by_pd_ctrl_name(pd_ctrl_name, &enc_info);
++    ERR_TRACE(TRACE_ERROR, "%s(%d): find pdinfo (pd_ctrl_name, ret) = (%s, %d)\n", __func__, __LINE__, pd_ctrl_name, ret);
++    if(ret != 0)
++    {
++        return -1;
++    }
++
++    if (strncmp(enc_info.enc_sys_id, ENC_USB_PREFIX_SYS_ID, strlen(ENC_USB_PREFIX_SYS_ID)) == 0)
++    {
++        return -1;
++    }
++    return _sed_is_support(pd_ctrl_name);
++
++}
++
+ /**
+  * @fn int PD_SED_Is_Supported(IN int enc_id, IN int port_id)
+  * @brief Check if the disk supports SED feature (check by .conf).
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index e6c7d540da2..f385c0fed9e 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -13059,10 +13059,13 @@ int pd_sys_getinfo(IN char *enc_sys_id, IN char *pd_sys_id, OUT PD_INFO *pd_info
+         }
+     }
+ 
+-	if(sed_is_support(pd_info->pd_ctrl_name)==1) 
+-	{
+-		pd_info->capabilities |= PD_CAP_OPAL;
+-	}
++    if (strncmp(enc_sys_id, ENC_USB_PREFIX_SYS_ID, strlen(ENC_USB_PREFIX_SYS_ID)) != 0)
++    {
++        if(_sed_is_support(pd_info->pd_ctrl_name)==1) 
++        {
++            pd_info->capabilities |= PD_CAP_OPAL;
++        }
++    }
+ 
+     return ret;
+ }

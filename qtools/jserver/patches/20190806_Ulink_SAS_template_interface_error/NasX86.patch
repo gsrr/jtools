@@ -1,0 +1,24 @@
+diff --git a/NasUtil/da_util/da_sas.c b/NasUtil/da_util/da_sas.c
+index 3f3444d4f67..6eaa63c5466 100644
+--- a/NasUtil/da_util/da_sas.c
++++ b/NasUtil/da_util/da_sas.c
+@@ -2,7 +2,6 @@
+ #include "da_util.h"
+ #include "da_sas.h"
+ 
+-
+ void dump_datainfo(struct datainfo *dinfo)
+ {
+     int i;
+@@ -868,7 +867,10 @@ void headfunc_host_ip(struct headparas *hp, char *buf)
+ 
+ void headfunc_interface(struct headparas *hp, char *buf)
+ {
+-    sprintf(buf, "%s", hp->disktype);
++    if(strcmp(hp->disktype, "SAS") == 0)
++        sprintf(buf, "%s", "SCSI");
++    else
++        sprintf(buf, "%s", hp->disktype);
+ }
+ 
+ void headfunc_attribute(struct headparas *hp, char *buf)

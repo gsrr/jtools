@@ -1,0 +1,2 @@
+<manifest dst="172.17.22.179" src="/datapool/git_qnap/">
+<project name="linux" path="NasX86/Kernel/linux-4.14" revision="localqnap414develop-20190905_sas_job_porting" /></manifest>

@@ -1,0 +1,20 @@
+diff --git a/RootFS/init.d_509/disk_data_collection.sh b/RootFS/init.d_509/disk_data_collection.sh
+index 9e062a6df01..0ea6fd80b05 100755
+--- a/RootFS/init.d_509/disk_data_collection.sh
++++ b/RootFS/init.d_509/disk_data_collection.sh
+@@ -37,12 +37,12 @@ for ((enc_id=0;enc_id<=$ENC_MAX_INTERNAL_ENCLOSURE_ID;enc_id++))
+ 			if [ $? == 0 ]; then
+ 				python /usr/local/bin/da_util.pyc upload_disk_data /tmp/smart/disk_data_pkg_$enc_id-$port_id.bin
+ 				if [ $? == 0 ]; then
+-					/usr/local/sbin/notify send -A "A002" -C "C004" -l "info" -t 3 -M "872" "[{0}] Uploaded disk analysis data. Disk: {1}." "%V026%" "$log_name"
++					/usr/local/sbin/notify send -A "A002" -C "C004" -l "warn" -t 3 -M "872" "[{0}] Uploaded disk analysis data. Disk: {1}." "%V026%" "$log_name"
+ 				else
+-					/usr/local/sbin/notify send -A "A002" -C "C004" -l "info" -t 3 -M "873" "[{0}] Failed to upload disk analysis data. Disk: {1}." "%V026%" "$log_name"
++					/usr/local/sbin/notify send -A "A002" -C "C004" -l "warn" -t 3 -M "873" "[{0}] Failed to upload disk analysis data. Disk: {1}." "%V026%" "$log_name"
+ 				fi
+ 			else
+-				/usr/local/sbin/notify send -A "A002" -C "C004" -l "info" -t 3 -M "873" "[{0}] Failed to upload disk analysis data. Disk: {1}." "%V026%" "$log_name"
++				/usr/local/sbin/notify send -A "A002" -C "C004" -l "warn" -t 3 -M "873" "[{0}] Failed to upload disk analysis data. Disk: {1}." "%V026%" "$log_name"
+ 			fi
+ 		}
+ 	fi

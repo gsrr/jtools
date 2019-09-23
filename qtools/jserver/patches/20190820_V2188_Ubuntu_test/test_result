@@ -1,0 +1,351 @@
+[marvell drive test]
+== unplug ==
+[  333.585002] CORE EH: io_chip_handle_cmpl_queue
+[  333.585006] root 0 queue 0 Attention entry 6
+[  333.585010] CORE EVENT: core_clear_root_int_from_queue
+[  333.585012] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  333.585014] CORE EVENT: core_clear_root_int_from_queue
+[  333.585016] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  333.585019] CORE EVENT: core_clear_root_int_from_queue
+[  333.585021] phy 1 irq_status = 0x1000000.
+[  333.585023] CORE EVENT: io_chip_handle_port_int
+[  333.585025] phy 1 irq_status 01000000.
+[  333.585026] CORE EVENT: io_chip_handle_port_int
+[  333.585029] PHY decoding error for root 0000000026f7b96d phy 1
+[  333.585031] CORE EVENT: io_chip_handle_port_int
+[  333.585033] cnt: 1
+[  333.585041] CORE EH: io_chip_handle_cmpl_queue
+[  333.585043] root 0 queue 0 Attention entry 7
+[  333.585046] CORE EVENT: core_clear_root_int_from_queue
+[  333.585047] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  333.585049] CORE EVENT: core_clear_root_int_from_queue
+[  333.585051] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  333.585054] CORE EVENT: core_clear_root_int_from_queue
+[  333.585055] phy 1 irq_status = 0x1000000.
+[  333.585056] CORE EVENT: io_chip_handle_port_int
+[  333.585058] phy 1 irq_status 01000000.
+[  333.585059] CORE EVENT: io_chip_handle_port_int
+[  333.585061] PHY decoding error for root 0000000026f7b96d phy 1
+[  333.585062] CORE EVENT: io_chip_handle_port_int
+[  333.585063] cnt: 2
+[  333.585103] CORE EH: io_chip_handle_cmpl_queue
+[  333.585105] root 0 queue 0 Attention entry 8
+[  333.585108] CORE EVENT: core_clear_root_int_from_queue
+[  333.585109] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  333.585111] CORE EVENT: core_clear_root_int_from_queue
+[  333.585113] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  333.585116] CORE EVENT: core_clear_root_int_from_queue
+[  333.585117] phy 1 irq_status = 0x1000000.
+[  333.585118] CORE EVENT: io_chip_handle_port_int
+[  333.585120] phy 1 irq_status 01000000.
+[  333.585121] CORE EVENT: io_chip_handle_port_int
+[  333.585122] PHY decoding error for root 0000000026f7b96d phy 1
+[  333.585124] CORE EVENT: io_chip_handle_port_int
+[  333.585125] cnt: 3
+[  333.585222] CORE EH: io_chip_handle_cmpl_queue
+[  333.585229] root 0 queue 0 Attention entry 9
+[  333.585236] CORE EVENT: core_clear_root_int_from_queue
+[  333.585249] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  333.585258] CORE EVENT: core_clear_root_int_from_queue
+[  333.585268] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  333.585274] CORE EVENT: core_clear_root_int_from_queue
+[  333.585287] phy 1 irq_status = 0x1000000.
+[  333.585297] CORE EVENT: io_chip_handle_port_int
+[  333.585307] phy 1 irq_status 01000000.
+[  333.585308] CORE EVENT: io_chip_handle_port_int
+[  333.585310] PHY decoding error for root 0000000026f7b96d phy 1
+[  333.585311] CORE EVENT: io_chip_handle_port_int
+[  333.585312] cnt: 4
+[  333.585356] CORE EH: io_chip_handle_cmpl_queue
+[  333.585358] root 0 queue 0 Attention entry 10
+[  333.585361] CORE EVENT: core_clear_root_int_from_queue
+[  333.585363] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  333.585364] CORE EVENT: core_clear_root_int_from_queue
+[  333.585366] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  333.585371] CORE EVENT: core_clear_root_int_from_queue
+[  333.585373] phy 1 irq_status = 0x1000000.
+[  333.585374] CORE EVENT: io_chip_handle_port_int
+[  333.585375] phy 1 irq_status 01000000.
+[  333.585376] CORE EVENT: io_chip_handle_port_int
+[  333.585378] PHY decoding error for root 0000000026f7b96d phy 1
+[  333.585379] CORE EVENT: io_chip_handle_port_int
+[  333.585381] cnt: 5
+[  333.585382] CORE EVENT: io_chip_handle_port_int
+[  333.585383] PHY Decode err do phy reset : phy 1 irq_status = 0x1000000.
+[  333.809303] CORE EVENT: mv_sata_decode_err_check
+[  333.809306] phy 1 READ_PORT_VSR_DATA: 0x1000ec4b
+[  333.809308] CORE EVENT: mv_sata_decode_err_check
+[  333.809310] phy 1 CONFIG_PORT_SERIAL_CTRL_STS: 0x00000002
+[  333.809311] CORE EVENT: mv_sata_decode_err_check
+[  333.809313] mv_sata_decode_err_check : phy 1 irq_status = 0x1000000 phy_statu                                                                                                              s = 0x122002.
+[  333.809317] CORE EVENT: mv_sata_decode_err_check
+[  333.809318] mv_sata_decode_err_check : phy 1 is not ready notify unplug event                                                                                                              .
+[  334.587460] CORE EVENT: pal_notify_event
+[  334.587461] duplicate event 0x0 on root 0000000026f7b96d phy 0x1.
+[  334.587462] CORE EVENT: io_chip_handle_port_int
+[  334.587463] PHY Decode err after phy reset : phy 1 irq_status = 0x1001001.
+[  334.587464] CORE EVENT: pal_event_handling
+[  334.587465] handle event: phy id 1, event id 0.
+[  334.587465] CORE EVENT: pal_event_handling
+[  334.587466] phy change event: phy 1, irq_status is 0x1001
+[  334.587466] CORE EVENT: pl_handle_hotplug_event
+[  334.587467] phy 1 irq_status = 0x1001.
+[  334.587494] CORE EH: io_chip_handle_cmpl_queue
+[  334.587495] root 0 queue 0 Attention entry 11
+[  334.617252] CORE EH: pal_abort_device_running_req
+[  334.617253] 0 requests aborted.
+[  334.617255] CORE EH: core_complete_device_waiting_queue
+[  334.617255] completed 0 error request.
+[  334.617256] CORE EH: core_complete_device_waiting_queue
+[  334.617257] 0 requests completed with status 0x6.
+[  334.617259] CORE: core_notify_device_hotplug
+[  334.617259] unplug device 1.
+[  334.617260] __MV__ msg insert  2.
+[  334.617260] __MV__ Message queue is not full.
+[  334.617262] CORE EH: pal_set_disk_offline
+[  334.617263] set down disk 1
+[  334.617264] CORE EH: pal_set_down_port
+[  334.617264] set down port 1
+[  334.617266] CORE EVENT: update_phy_info
+[  334.617267] phy 1 VSR_PHY_STATUS = 0x150000.
+[  334.617267] CORE EVENT: update_phy_info
+[  334.617268] phy 1 is no link ready. phy sts(0x15)
+[  334.617271] CORE EVENT: update_phy_info
+[  334.617271] phy 1 phy_status = 0x2.
+[  334.617273] CORE: update_phy_info
+[  334.617274] Has VSR_IRQ_PHY TIMEOUT: 1000EC4B.
+[  334.617274] CORE EVENT: update_phy_info
+[  334.617275] PHY State Machine Timeout. PHY Status 0x16.
+[  334.617275] CORE EVENT: update_phy_info
+[  334.617276] phy 1 irq_status = 0x1001001.
+[  334.617276] CORE: pl_handle_unplug
+[  334.617277] phy 1 is now gone
+[  334.617279] CORE EVENT: core_clear_root_int_from_queue
+[  334.617280] phy 1 CONFIG_PORT_IRQ_STAT: 0x01000000
+[  334.617281] CORE EVENT: core_clear_root_int_from_queue
+[  334.617281] Error Interrupt: PHY Decoding Error (Bit 24) , CONFIG_PORT_IRQ_ST                                                                                                              AT: 0x01000000
+[  334.617283] CORE EVENT: core_clear_root_int_from_queue
+[  334.617284] phy 1 irq_status = 0x1000000.
+[  334.617284] CORE EVENT: io_chip_handle_port_int
+[  334.617286] phy 1 irq_status 01000000.
+[  334.617289] CORE EVENT: io_chip_handle_port_int
+[  334.617294] PHY decoding error for root 0000000026f7b96d phy 1
+[  334.617296] CORE EVENT: io_chip_handle_port_int
+[  334.617297] cnt: 1
+[  334.617481] __MV__  msg queue isn't empty.
+[  334.617482] __MV__ process queue starts.
+[  334.617482] __MV__ In hba_proc_msg.
+[  334.617484] __MV__ remove scsi disk 0-1-0.
+[  334.617906] sd 8:0:1:0: [sdb] Synchronizing SCSI cache
+[  334.617933] sd 8:0:1:0: [sdb] Synchronize Cache(10) failed: Result: hostbyte=                                                                                                              DID_NO_CONNECT driverbyte=DRIVER_OK
+[  334.681146] __MV__ process queue ends.
+[  334.681148] __MV__ process queue starts.
+[  334.681149] __MV__ process queue ends.
+[  335.629025] CORE EVENT: mv_sata_decode_err_check
+[  335.629052] phy 1 READ_PORT_VSR_DATA: 0x1000ec4b
+[  335.629055] CORE EVENT: mv_sata_decode_err_check
+[  335.629059] phy 1 CONFIG_PORT_SERIAL_CTRL_STS: 0x00000002
+[  335.629061] CORE EVENT: mv_sata_decode_err_check
+[  335.629065] mv_sata_decode_err_check : phy 1 irq_status = 0x0 phy_status = 0x                                                                                                              2.
+[  335.629071] CORE EVENT: mv_sata_decode_err_check
+[  335.629074] mv_sata_decode_err_check : phy 1 is not ready notify unplug event                                                                                                              .
+[  336.652970] CORE EVENT: pal_event_handling
+[  336.652974] handle event: phy id 1, event id 0.
+[  336.652975] CORE EVENT: pal_event_handling
+[  336.652977] phy change event: phy 1, irq_status is 0x1001
+[  336.652979] CORE EVENT: pl_handle_hotplug_event
+[  336.652980] phy 1 irq_status = 0x1001.
+[  336.682750] CORE EH: pal_set_down_port
+[  336.682751] set down port 1
+[  336.682754] CORE EVENT: update_phy_info
+[  336.682754] phy 1 VSR_PHY_STATUS = 0x150000.
+[  336.682755] CORE EVENT: update_phy_info
+[  336.682756] phy 1 is no link ready. phy sts(0x15)
+[  336.682760] CORE EVENT: update_phy_info
+[  336.682760] phy 1 phy_status = 0x2.
+[  336.682763] CORE: update_phy_info
+[  336.682764] Has VSR_IRQ_PHY TIMEOUT: 1000EC4B.
+[  336.682765] CORE EVENT: update_phy_info
+[  336.682765] PHY State Machine Timeout. PHY Status 0x16.
+[  336.682766] CORE EVENT: update_phy_info
+[  336.682766] phy 1 irq_status = 0x1001.
+[  336.682767] CORE: pl_handle_unplug
+[  336.682767] phy 1 is now gone
+
+== plug ==
+[  382.141045] CORE EH: io_chip_handle_cmpl_queue
+[  382.141048] root 0 queue 0 Attention entry 12
+[  382.141052] CORE EVENT: core_clear_root_int_from_queue
+[  382.141054] phy 3 CONFIG_PORT_IRQ_STAT: 0x00000081
+[  382.141057] CORE EVENT: core_clear_root_int_from_queue
+[  382.141059] READ_PORT_VSR_DATA: 0x0000ec02
+[  382.141060] CORE EVENT: core_clear_root_int_from_queue
+[  382.141062] phy 3 irq_status = 0x1.
+[  382.141063] CORE EVENT: io_chip_handle_port_int
+[  382.141065] phy 3 irq_status 00000001.
+[  382.762170] CORE EVENT: pal_event_handling
+[  382.762174] handle event: phy id 3, event id 0.
+[  382.762176] CORE EVENT: pal_event_handling
+[  382.762178] phy change event: phy 3, irq_status is 0x1
+[  382.762179] CORE EVENT: pl_handle_hotplug_event
+[  382.762181] phy 3 irq_status = 0x1.
+[  382.772107] CORE EVENT: update_phy_info
+[  382.772109] phy 3 VSR_PHY_STATUS = 0x1d8000.
+[  382.772110] CORE EVENT: update_phy_info
+[  382.772112] phy 3 is link on  6.0G. phy sts(0x1d)
+[  382.772117] CORE EVENT: update_phy_info
+[  382.772118] phy 3 phy_status = 0x122002.
+[  382.772121] CORE EVENT: update_phy_info
+[  382.772123] phy 3 irq_status = 0x1.
+[  382.772125] CORE: get_port
+[  382.772127] phy 3 on port 3.
+[  382.801959] CORE EH: io_chip_handle_cmpl_queue
+[  382.801963] root 0 queue 0 Attention entry 13
+[  382.901122] CORE: sata_init_port
+[  382.901123] port 0000000044112d2c
+[  382.901126] CORE: sata_port_state_machine
+[  382.901127] port 0000000044112d2c phy 3 state 0x1,port->sata_sig_timer=ffff, port->phy->sata_signature=ffffffff.
+[  382.901131] CORE EVENT: core_clear_root_int_from_queue
+[  382.901132] phy 3 CONFIG_PORT_IRQ_STAT: 0x00010080
+[  382.901134] CORE EVENT: core_clear_root_int_from_queue
+[  382.901134] phy 3 irq_status = 0x10000.
+[  382.901135] CORE EVENT: io_chip_handle_port_int
+[  382.901135] phy 3 irq_status 00010000.
+[  382.901136] CORE: sata_port_notify_event
+[  382.901137] port 0000000044112d2c state 2, irq_status 00010000.
+[  382.901139] CORE: sata_port_store_sig
+[  382.901140] sig from signature FIS, 0x101
+[  382.901140] CORE: sata_port_store_sig
+[  382.901141] sata port:0 receive signature FIS:101
+[  382.901368] CORE: sata_port_intl_req_callback
+[  382.901370] port 0000000044112d2c phy 3 state 0x2 req 00000000c0912508,port->sata_sig_timer=ffff.
+[  382.950983] CORE: sata_port_state_machine
+[  382.950984] port 0000000044112d2c phy 3 state 0x3,port->sata_sig_timer=ffff, port->phy->sata_signature=ffffffff.
+[  382.951053] CORE EH: io_chip_handle_cmpl_queue
+[  382.951054] root 0 queue 0 Attention entry 16
+[  382.951055] CORE EVENT: core_clear_root_int_from_queue
+[  382.951056] phy 3 CONFIG_PORT_IRQ_STAT: 0x00010000
+[  382.951057] CORE EVENT: core_clear_root_int_from_queue
+[  382.951058] phy 3 irq_status = 0x10000.
+[  382.951058] CORE EVENT: io_chip_handle_port_int
+[  382.951059] phy 3 irq_status 00010000.
+[  382.951059] CORE: sata_port_notify_event
+[  382.951060] port 0000000044112d2c state 3, irq_status 00010000.
+[  382.951062] CORE: sata_port_store_sig
+[  382.951062] sig from signature FIS, 0x101
+[  382.951063] CORE: sata_port_store_sig
+[  382.951063] sata port:0 receive signature FIS:101
+[  382.951064] CORE: sata_port_intl_req_callback
+[  382.951066] port 0000000044112d2c phy 3 state 0x3 req 00000000c0912508,port->sata_sig_timer=ffff.
+[  382.951067] CORE: sata_port_state_machine
+[  382.951068] port 0000000044112d2c phy 3 state 0x4,port->sata_sig_timer=ffff, port->phy->sata_signature=101.
+[  382.951070] CORE: sata_device_state_machine
+[  382.951070] dev 00000000b20b846c(3) state 0x5.
+[  382.951384] CORE: sata_parse_identify_data
+[  382.951386] SATA dev support HIPM.
+[  382.951394] CORE: sata_device_state_machine
+[  382.951399] dev 00000000b20b846c(3) state 0x6.
+[  383.849809] CORE: sata_device_state_machine
+[  383.849814] dev 00000000b20b846c(3) state 0x7.
+[  384.749892] CORE: sata_device_state_machine
+[  384.749896] dev 00000000b20b846c(3) state 0x8.
+[  385.649974] CORE: sata_device_state_machine
+[  385.649979] dev 00000000b20b846c(3) state 0x9.
+[  385.650205] CORE: sata_device_state_machine
+[  385.650207] dev 00000000b20b846c(3) state 0xa.
+[  385.650210] CORE: core_notify_device_hotplug
+[  385.650212] plugin device 3.
+[  385.650214] __MV__ msg insert  1.
+[  385.650215] __MV__ Message queue is not full.
+[  385.650226] __MV__  msg queue isn't empty.
+[  385.650227] __MV__ process queue starts.
+[  385.650229] __MV__ In hba_proc_msg.
+[  385.650616] CORE: sata_parse_identify_data
+[  385.650618] SATA dev support HIPM.
+[  385.650666] scsi 8:0:3:0: Direct-Access     ATA      PLEXTOR PX-256M6 1.03 PQ: 0 ANSI: 5
+[  385.961921] finished io control.
+[  386.985877] finished io control.
+[  386.989122] sd 8:0:3:0: Attached scsi generic sg2 type 0
+[  386.989203] __MV__ add scsi disk 0-3-0.
+[  386.989205] __MV__ process queue ends.
+[  386.989206] __MV__ process queue starts.
+[  386.989207] __MV__ process queue ends.
+[  386.990909] sd 8:0:3:0: [sdb] 500118192 512-byte logical blocks: (256 GB/238 GiB)
+[  386.990954] sd 8:0:3:0: [sdb] Write Protect is off
+[  386.990959] sd 8:0:3:0: [sdb] Mode Sense: 41 00 00 00
+[  386.991035] sd 8:0:3:0: [sdb] Write cache: enabled, read cache: enabled, doesn't support DPO or FUA
+[  386.991045] CORE EH: io_chip_complete_requests
+[  386.991048] req 000000001dbdd54f [0xa3] status 0x7
+[  386.991052] dev:3 MV Sense: response 70 SK SCSI_SK_ILLEGAL_REQUEST ASC 24 ASCQ 0.
+
+[  386.994292]  sdb: sdb1 sdb2
+[  386.996770] sd 8:0:3:0: [sdb] Attached SCSI disk
+[  387.000214] CORE: sata_parse_identify_data
+[  387.000216] SATA dev support HIPM.
+
+[file system]
+root@jerrie-Default-string:~# mkfs.ext4 /dev/sdb
+mke2fs 1.44.1 (24-Mar-2018)
+/dev/sdb contains a iso9660 file system labelled 'Ubuntu 18.04.3 LTS amd64'
+Proceed anyway? (y,N) y
+Creating filesystem with 62514774 4k blocks and 15630336 inodes
+Filesystem UUID: 1b3c09e9-4f45-4a74-bdb5-e6237bac5e78
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632, 2654208,
+        4096000, 7962624, 11239424, 20480000, 23887872
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (262144 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+root@jerrie-Default-string:~# mount /dev/sdb /mnt
+root@jerrie-Default-string:~# cd /mnt
+root@jerrie-Default-string:/mnt# ls
+lost+found
+root@jerrie-Default-string:/mnt# touch file1
+root@jerrie-Default-string:/mnt# ls -al
+total 24
+drwxr-xr-x  3 root root  4096  八  20 13:37 .
+drwxr-xr-x 24 root root  4096  八  19 13:49 ..
+-rw-r--r--  1 root root     0  八  20 13:37 file1
+drwx------  2 root root 16384  八  20 13:37 lost+found
+root@jerrie-Default-string:/mnt# echo "111111" > file2
+root@jerrie-Default-string:/mnt# cat file2
+111111
+
+
+
+[10G driver test]
+0b:00.0 Ethernet controller: Aquantia Corp. Device 0001 (rev 02)
+0c:00.0 Ethernet controller: Aquantia Corp. Device 0001 (rev 02)
+
+enp12s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.17.22.91  netmask 255.255.254.0  broadcast 172.17.23.255
+        inet6 fd44:c967:3d09:0:784d:e5ed:c2c1:f2a4  prefixlen 64  scopeid 0x0<gl
+obal>
+        inet6 fd44:c967:3d09::846  prefixlen 128  scopeid 0x0<global>
+        inet6 fd44:c967:3d09:0:5308:b9c0:7b38:d13  prefixlen 64  scopeid 0x0<glo
+bal>
+        inet6 fe80::80ad:f4bc:fd2e:3fb4  prefixlen 64  scopeid 0x20<link>
+        ether 24:5e:be:35:0a:b0  txqueuelen 1000  (Ethernet)
+        RX packets 48247  bytes 25391739 (25.3 MB)
+        RX errors 0  dropped 2796  overruns 0  frame 0
+        TX packets 4332  bytes 499621 (499.6 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+
+enp11s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.17.22.111  netmask 255.255.254.0  broadcast 172.17.23.255
+        inet6 fd44:c967:3d09:0:99fa:3100:7428:8fc1  prefixlen 64  scopeid 0x0<gl
+obal>
+        inet6 fd44:c967:3d09::5bf  prefixlen 128  scopeid 0x0<global>
+        inet6 fe80::77fe:e59a:d8f4:d3f9  prefixlen 64  scopeid 0x20<link>
+        inet6 fd44:c967:3d09:0:3109:6107:b474:9e52  prefixlen 64  scopeid 0x0<gl
+obal>
+        ether 24:5e:be:35:0a:b1  txqueuelen 1000  (Ethernet)
+        RX packets 8010  bytes 3918042 (3.9 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 180  bytes 25073 (25.0 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+

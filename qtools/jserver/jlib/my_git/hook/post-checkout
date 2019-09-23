@@ -1,24 +1,28 @@
 #!/usr/bin/python
 
 import os
-import git
+import my_git
 import xml.etree.cElementTree as ET
 
 patches_dir = '/datapool/qtools/jserver/patches/'
 
-
+#  <project path="NasX86" name="NasX86" revision="localmaster-20190812_Ulink_NvmeSelfTestLog_size_error"/>
 def update_manifest(branch, manifest):
-    tree = ET.ElementTree(file='%s/manifest'%fpath)
+    repo_name = my_git.get_repo_name()
+    tree = ET.ElementTree(file=manifest)
     root = tree.getroot()
-     
-
+    c = ET.Element("project")
+    c.attrib["path"] = os.path.splitext(repo_name)[0]
+    c.attrib["name"] = os.path.splitext(repo_name)[0]
+    c.attrib["revision"] = branch
+    print (c)
+    root.append(c)
+    tree.write(manifest)
 
 def main():
-    repo = git.Repo.init(path='.')
-    branch_name = str(repo.head.ref)
-    if branch_name == "master":
-        return
-    if branch_name.startswith("local") == False:
+    branch_name = my_git.get_branch_name()
+
+    if my_git.is_branch_name_valid(branch_name) == False:
         return
 
     patch_name = branch_name.split("-", 1)[1]
@@ -34,9 +38,9 @@ def main():
 
     os.system("cp %s %s"%(readme_src, readme_dst))
     os.system("cp %s %s"%(manifest_src, manifest_dst))
-    print patch_dir
+    print (patch_dir)
     update_manifest(branch_name, manifest_dst)
-    
+    #update_readme(branch_name, readme_dst)
 
 if __name__ == "__main__":
     main()

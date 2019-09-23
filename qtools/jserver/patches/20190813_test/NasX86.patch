@@ -1,0 +1,28 @@
+diff --git a/NasUtil/da_util/da_system.c b/NasUtil/da_util/da_system.c
+index 5f5e78bb38e..293ee22754d 100644
+--- a/NasUtil/da_util/da_system.c
++++ b/NasUtil/da_util/da_system.c
+@@ -63,15 +63,20 @@ int dump_buffer_to_file(char *fpath, char *blob)
+ int raid_info_dump_to_buffer(RAID_DA_Template *raid_info, char *blob)
+ {
+     int offset = 0;
+-    int temp = 203, rev = 100, cnt = 4, size = 512;
++    int temp = 203, rev = 100, cnt = 4, size = 512, classifier = 0;
+      
+     write_data_to_buffer(blob, &temp, 2, &offset);
+     write_data_to_buffer(blob, &rev, 2, &offset);
+     write_data_to_buffer(blob, &cnt, 2, &offset);
+     write_data_to_buffer(blob, &size, 2, &offset);
+-    offset += 8;
++    write_data_to_buffer(blob, &classifier, 2, &offset);
++    offset += 6;
+ 
+-    write_data_to_buffer(blob, &(raid_info->group_id), 2, &offset);
++    if(classifier == 0)
++    {
++        write_data_to_buffer(blob, &(raid_info->group_id), 2, &offset);
++        offset += 30;
++    }
+     write_data_to_buffer(blob, &(raid_info->type), 2, &offset);
+     write_data_to_buffer(blob, &(raid_info->capacity), 8, &offset);
+     write_data_to_buffer(blob, &(raid_info->status), 2, &offset);

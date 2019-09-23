@@ -1,0 +1,2 @@
+<manifest dst="172.17.22.179" src="/datapool/git_qnap/">
+<project name="NasX86" path="NasX86" revision="localmaster-20190813_test" /></manifest>

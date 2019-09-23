@@ -1,0 +1,13 @@
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 129e994f3dd..983f043d511 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -13748,7 +13748,7 @@ void da_iotest(int enc_id, int port_id)
+ int da_copy_from_file(FILE *output, char *src)
+ {
+     FILE *input = NULL;
+-    char c;
++    int c;
+ 
+     input = fopen(src, "r");
+     if(input == NULL) 

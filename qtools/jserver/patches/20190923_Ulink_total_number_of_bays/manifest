@@ -1,0 +1,2 @@
+<manifest dst="172.17.22.179" src="/datapool/git_qnap/">
+<project name="NasX86" path="NasX86" revision="local4.4.1-20190923_Ulink_total_number_of_bays" /></manifest>

@@ -1,0 +1,9 @@
+[ODMAIPD0-20][Disk Failure Analysis] Implement Template 017, 018, 019, 332, 333
+
+model
+    TS-ALL
+description
+    modify data format list from 4 to 5
+related files
+    NasUtil/da_util/da_sas.c
+	NasUtil/da_util/da_sas.h

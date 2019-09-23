@@ -1,0 +1,40 @@
+[sata template 017,018,019 - test]
+root@jerry05-pc /datapool/test_examples/sata (master) $ python test_da_sata.py disk_data.bin
+Successful offset=11264, length=512, template=17
+Successful offset=11776, length=512, template=18
+Successful offset=12288, length=512, template=19
+
+[sas template 332 and 333 - 5120 bytes test]
+(template, op, length) = (301, 02, -2)
+(template, op, length) = (302, 03, 20)
+(template, op, length) = (303, 05, -2)
+(template, op, length) = (304, 06, -2)
+(template, op, length) = (305, 08, -2)
+(template, op, length) = (306, 0d, 16)
+(template, op, length) = (307, 0e, -2)
+(template, op, length) = (308, 0f, -2)
+(template, op, length) = (309, 10, 404)
+(template, op, length) = (310, 11, 12)
+(template, op, length) = (311, 15, -1)
+(template, op, length) = (312, 17, -2)
+(template, op, length) = (313, 18, -2)
+(template, op, length) = (314, 19, -1)
+(template, op, length) = (315, 2f, 16)
+(template, op, length) = (320, 80, 24)
+(template, op, length) = (321, 83, 16)
+(template, op, length) = (322, 86, -2)
+(template, op, length) = (323, 87, 8)
+(template, op, length) = (324, 88, -2)
+(template, op, length) = (325, 90, -2)
+(template, op, length) = (326, 91, -2)
+(template, op, length) = (327, b0, 64)
+(template, op, length) = (328, b1, 64)
+(template, op, length) = (330, 25, 8)
+(template, op, length) = (331, 9e, 32)
+(template, op, length) = (332, 0c, 5128)
+(template, op, length) = (333, 14, 5128)
+(template, op, length) = (334, 12, 74)
+(template, op, length) = (203, cb, -1)
+
+
+

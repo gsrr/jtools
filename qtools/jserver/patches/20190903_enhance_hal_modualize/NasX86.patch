@@ -1,0 +1,707 @@
+diff --git a/NasLib/hal/Makefile b/NasLib/hal/Makefile
+index 389ece556a4..4e59440769d 100755
+--- a/NasLib/hal/Makefile
++++ b/NasLib/hal/Makefile
+@@ -55,7 +55,7 @@ HAL_STATIC_LIB = libuLinux_hal.a
+ OBJS_HAL_LIB = hal_enc.o hal_pd.o hal_gpio.o hal_hm.o hal_net.o hal_prt.o hal_mb.o hal_resctrl.o hal_tl.o \
+                hal_sys_pd.o hal_sys_enc.o hal_sys_sio.o hal_sys_common.o hal_sys_ich.o hal_sys_net.o hal_sys_prt.o hal_sys_pic.o hal_sys_mcu.o hal_sys_emcu.o hal_sys_uart.o\
+                hal_utils.o err_trace.o hal_sys_soc.o hal_sys_i2c.o hal_i2c.o hal_conf.o hal_sys_mem.o  hal_sys_ec.o hal_sys_pci.o hal_ipmi.o hal_sys_cpld.o hal_sys_qm2.o hal_sys_tbt.o\
+-               hal_sys_raidmgr.o hal_sys_raidapi.o hal_sys_scsi.o hal_poe.o hal_sys_sw.o hal_sys_poe.o hal_fc.o hal_sys_fc.o hal_sys_qxp.o hal_sys_tls.o hal_lib_sas.o
++               hal_sys_raidmgr.o hal_sys_raidapi.o hal_sys_scsi.o hal_poe.o hal_sys_sw.o hal_sys_poe.o hal_fc.o hal_sys_fc.o hal_sys_qxp.o hal_sys_tls.o hal_lib_sas.o hal_lib_adapter.o
+ 
+ HAL_TR_SHARE_LIB = libuLinux_hal_tr.so
+ HAL_TR_STATIC_LIB = libuLinux_hal_tr.a
+@@ -69,7 +69,7 @@ HAL_ALL = $(HAL_SHARE_LIB) $(HAL_STATIC_LIB) $(HAL_TR_SHARE_LIB) $(HAL_TR_STATIC
+ all : $(HAL_ALL)
+ 
+ $(HAL_SHARE_LIB) : $(OBJS_HAL_LIB)
+-	$(CC) -shared -fPIC -o $(HAL_SHARE_LIB) $(OBJS_HAL_LIB) -lrt
++	$(CC) -shared -fPIC -o $(HAL_SHARE_LIB) $(OBJS_HAL_LIB) -lrt -ldl
+ 	
+ $(HAL_STATIC_LIB) : $(OBJS_HAL_LIB)
+ 	ar -cru  $(HAL_STATIC_LIB) $(OBJS_HAL_LIB)
+diff --git a/NasLib/hal/hal_enc.c b/NasLib/hal/hal_enc.c
+index ca072a66bd0..bd11e74cbf2 100755
+--- a/NasLib/hal/hal_enc.c
++++ b/NasLib/hal/hal_enc.c
+@@ -38,6 +38,7 @@
+ #include "hal_common.h"
+ #include "ini_config.h"
+ #include "hal_sys.h"
++#include "hal_lib_adapter.h"
+ 
+ #define ENC_MAPPING_FILE                    "/etc/config/enclosure.map"
+ 
+@@ -649,6 +650,7 @@ static int se_get_id(char* enc_sys_id, int* enc_idP, ENCLOSURE_INFO* enc_infoP)
+  */
+ static int se_write_conf(int enc_id, ENCLOSURE_INFO* enc_infoP)
+ {
++    int ret = -1;
+     char enc_sec[MAX_SECTION_LEN], enc_sec_real[MAX_SECTION_LEN];
+     char ascii_str[MAX_ID_STR_LEN];
+     char tmp_str[MAX_ID_STR_LEN];
+@@ -656,6 +658,8 @@ static int se_write_conf(int enc_id, ENCLOSURE_INFO* enc_infoP)
+     char field[MAX_SECTION_LEN] = {0};
+     int i;
+     
++    HAL_MODULE_ADAPTER(hal_adapter_write_enc_conf(enc_id, enc_infoP));
++
+     // For TL-SATA enclosures with invalid/incompleted
+     if ((strstr(enc_infoP->enc_sys_id, ENC_TLS) != NULL) && 
+         (tls_validate_enc_sys_id(enc_infoP->enc_sys_id) == 0))
+@@ -4606,6 +4610,18 @@ int SE_Upgrade_SR_FW(IN int enc_id, IN int port_id, IN char* img_path, OUT char*
+     return ret;
+ }
+ 
++int se_attach_specific(char *enc_sys_id, int enc_id, ENCLOSURE_INFO *enc_info)
++{
++    int ret = -1;
++    HAL_MODULE_ADAPTER(hal_adapter_se_attach_specific(enc_sys_id, enc_id));
++
++    if (enc_info->protocol == PROTOCOL_SAS)
++        ret = se_sys_set_7_segment_led(enc_sys_id, enc_id);
++    else if(enc_info->protocol == PROTOCOL_THUNDERBOLT)
++        ret = se_sys_set_7_segment_led(enc_sys_id, enc_id); // 1~9 , support only one 7-segment led
++    return ret;
++}
++
+ /**
+  * @fn int se_attach(char *enc_sys_id, in enc_attach)
+  * @brief Add the specified enclosure object to the internal configuration file.
+@@ -4698,13 +4714,15 @@ int se_attach(char *enc_sys_id, int enc_attach)
+             if (se_write_conf(enc_id, &enc_info) >= 0)
+             {   // rescan the physical disks in this enclosure
+                ret = PD_Scan(enc_id);    
++               if(ret != 0)
++               {
++                   return ret;
++               }
+             }
+             // Display the enclosure id for SAS enclosure
+-            if (enc_info.protocol == PROTOCOL_SAS)
+-                se_sys_set_7_segment_led(enc_sys_id, enc_id);
+-            else if(enc_info.protocol == PROTOCOL_THUNDERBOLT)
+-                se_sys_set_7_segment_led(enc_sys_id, enc_id); // 1~9 , support only one 7-segment led
+-            else if(enc_info.protocol == PROTOCOL_TL_SATA)
++            se_attach_specific(enc_sys_id, enc_id, &enc_info);
++            
++            if(enc_info.protocol == PROTOCOL_TL_SATA)
+             {
+                 // Each time the TL-SATA JBOD attaches, update QXP minisas port info here
+                 max_pcie_slot = HAL_MB_Get_PCIe_Slot_Count();
+diff --git a/NasLib/hal/hal_lib_adapter.c b/NasLib/hal/hal_lib_adapter.c
+new file mode 100644
+index 00000000000..05b92e9caca
+--- /dev/null
++++ b/NasLib/hal/hal_lib_adapter.c
+@@ -0,0 +1,170 @@
++#include <dlfcn.h>
++
++#include "hal.h"
++
++#define HAL_MOUDLE_PATH "/root/module"
++
++void *adapter_handle = NULL;
++
++int hal_adapter_enc_get_info(char *enc_sys_id, ENCLOSURE_INFO *enc_info)
++{
++    int ret = -1;
++    int (*func)(char*, ENCLOSURE_INFO*);
++    if(adapter_handle == NULL)
++    {
++        adapter_handle = dlopen(HAL_MOUDLE_PATH"/adapter.so", RTLD_LAZY);
++    }
++    func = dlsym(adapter_handle, "get_enc_info"); 
++
++    memset(enc_info, 0, sizeof(ENCLOSURE_INFO));
++    ret = func(enc_sys_id, enc_info);
++    printf("%s : %s, %d\n", __func__, enc_sys_id, ret);
++    //dlclose(adpater_handle);
++    return ret;
++}
++
++int hal_adapter_enc_write_conf(int enc_id, ENCLOSURE_INFO *enc_info)
++{
++    int ret = -1;
++    int (*func)(int, ENCLOSURE_INFO*);
++
++    if(adapter_handle == NULL)
++    {
++        adapter_handle = dlopen(HAL_MOUDLE_PATH"/adapter.so", RTLD_LAZY);
++    }
++    func = dlsym(adapter_handle, "write_enc_conf"); 
++
++    ret = func(enc_id, enc_info);
++    printf("%s : %d, %d\n", __func__, enc_id, ret);
++    return ret;
++}
++
++int hal_adapter_enc_se_attach_specific(char *enc_sys_id, int enc_id)
++{
++    int ret = -1;
++    int (*func)(char*, int);
++
++    if(adapter_handle == NULL)
++    {
++        adapter_handle = dlopen(HAL_MOUDLE_PATH"/adapter.so", RTLD_LAZY);
++    }
++    func = dlsym(adapter_handle, "se_attach_specific"); 
++
++    ret = func(enc_sys_id, enc_id);
++    printf("%s : %d, %d\n", __func__, enc_id, ret);
++    return ret;
++}
++
++int hal_adapter_enc_set_identify_led(char *enc_sys_id, int enable)
++{
++    printf("%s : %s, %d\n", __func__, enc_sys_id, enable);
++    return -1;
++}
++
++int hal_adapter_enc_get_temp(IN char *enc_sys_id, IN TEMP_INDEX temp_index, OUT double *dValueP)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_disk_get_temp(IN int enc_id, IN int port_id, IN int direct, OUT int *temp)
++{
++    printf("%s : %d, %d\n", __func__, enc_id, port_id);
++    return -1;
++}
++
++int hal_adapter_enc_get_fan_speed(IN char *enc_sys_id, IN FAN_INDEX fan_index, OUT unsigned int *dwValueP, OUT unsigned int *fan_fail)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_set_fan_speed(IN char *enc_sys_id, IN FAN_INDEX fan_index, IN FAN_SPEED fan_speed)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_restore_default_fan(IN char *enc_sys_id)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_set_status_led(IN char *enc_sys_id, IN STATUS_LED_COLOR color, IN int enable)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_set_fanerr_led(IN char *enc_sys_id, IN int mode)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_set_buzzer(IN char *enc_sys_id, IN BUZZER_MODE mode)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_get_board_sn(IN char* enc_sys_id, OUT char *serial_no, IN unsigned int buf_len)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_set_board_sn(IN char* enc_sys_id, OUT char *serial_no, IN unsigned int buf_len)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_update_fw(IN char* enc_sys_id, IN char *filename)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_enc_get_fw_version(IN char* enc_sys_id, OUT char *version, IN int buf_len)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_disk_pd_scan(int enc_id)
++{
++    int ret = -1;
++    int (*func)(int);
++
++    if(adapter_handle == NULL)
++    {
++        adapter_handle = dlopen(HAL_MOUDLE_PATH"/adapter.so", RTLD_LAZY);
++    }
++    func = dlsym(adapter_handle, "pd_scan"); 
++
++    ret = func(enc_id);
++    printf("%s : %d, %d\n", __func__, enc_id, ret);
++    return ret;
++}
++
++int hal_adapter_disk_set_present_led(IN char *enc_sys_id, IN int port_id, IN int enable)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++int hal_adapter_disk_get_smart(IN char *enc_sys_id, IN char *pd_sys_id, OUT int* sense_code, OUT PD_SCSI_LOG_PAGE log_page_ary[], IN int page_ary_count)
++{
++    printf("%s : %s\n", __func__, enc_sys_id);
++    return -1;
++}
++
++#ifdef UNIT_TEST
++
++int main(int argc, char * argv[])
++{
++    return 0;
++}
++#endif
+diff --git a/NasLib/hal/hal_lib_adapter.h b/NasLib/hal/hal_lib_adapter.h
+new file mode 100644
+index 00000000000..69f1297f8e3
+--- /dev/null
++++ b/NasLib/hal/hal_lib_adapter.h
+@@ -0,0 +1,6 @@
++#define HAL_MODULE_ADAPTER(A) {\
++    ret = A;\
++    if(ret == 0)\
++        return ret;\
++}
++
+diff --git a/NasLib/hal/hal_pd.c b/NasLib/hal/hal_pd.c
+index 4a5d09a5f34..5153518107d 100755
+--- a/NasLib/hal/hal_pd.c
++++ b/NasLib/hal/hal_pd.c
+@@ -40,6 +40,7 @@
+ #include "hal_common.h"
+ #include "ini_config.h"
+ #include "hal_sys_raidapi.h"
++#include "hal_lib_adapter.h"
+ 
+ typedef struct _PD_ENUM_CALLBACK_CONTEXT
+ {
+@@ -4492,6 +4493,7 @@ int PD_Get_Dev_No_By_Sys_Name(IN char* pd_sys_name, OUT dev_t* dev_noP)
+  */
+ int PD_Scan(int enc_id)
+ {
++    int ret = -1;
+     int i, count;
+     char enc_sys_id[MAX_SYS_ID_LEN];
+     char* pd_sys_id[MAX_PD_NUM];
+@@ -4499,6 +4501,8 @@ int PD_Scan(int enc_id)
+     
+     ERR_TRACE(TRACE_ENTRY, "%s: got called with(%d).\n", __func__, enc_id);
+ 
++    HAL_MODULE_ADAPTER(hal_adapter_pd_scan(enc_id)); 
++
+     // scan iscsi PD if backup configure file exist
+     if ((enc_id == ENC_ISCSI_ENCLOSURE_ID) && stat(ENC_ISCSI_CONF_BAK_FILE, &fstat) < 0)
+         return 0;
+diff --git a/NasLib/hal/hal_sys_enc.c b/NasLib/hal/hal_sys_enc.c
+index 370d4afcd95..38241b12921 100755
+--- a/NasLib/hal/hal_sys_enc.c
++++ b/NasLib/hal/hal_sys_enc.c
+@@ -45,6 +45,7 @@
+ #include "hal_utils.h"
+ #include "hal_sys_raidapi.h"
+ #include "hal_sys_vendorapi.h"
++#include "hal_lib_adapter.h"
+ 
+ #define UINT64_SUM(a,b)\
+             (0xFFFFFFFFFFFFFFFF - (uint64_t)a < (uint64_t)b)?\
+@@ -10961,7 +10962,8 @@ static int sas_expander_get_connector_status(IN char *enc_sys_id, OUT int* statu
+     return index_count;
+ }
+ 
+-static int sas_expander_getinfo(IN char *enc_sys_id, OUT ENCLOSURE_INFO *enc_info)
++int sas_expander_getinfo(IN char *enc_sys_id, OUT ENCLOSURE_INFO *enc_info)
++//static int sas_expander_getinfo(IN char *enc_sys_id, OUT ENCLOSURE_INFO *enc_info)
+ {
+     char buf[MAX_STDOUT_LEN] = {0};
+     int count = 0;
+@@ -10971,7 +10973,7 @@ static int sas_expander_getinfo(IN char *enc_sys_id, OUT ENCLOSURE_INFO *enc_inf
+     int enc_conf_len,ele_count;
+     int capabilities = 0;
+     int ret = 0, link_speed[8], phy_num = 0, index;
+-
++    
+     Ini_Conf_Get_Field_Int(HAL_MODEL_CONF, CONF_SECTION_SYSTEM, CONF_FIELD_CAP, &capabilities, 1);
+     if (capabilities & SE_CAP_NO_SAS_ENCLOSURE)
+         return -1;
+@@ -13079,6 +13081,19 @@ int se_sys_quick_poweroff(void)
+ int se_sys_getinfo(IN char *enc_sys_id, OUT ENCLOSURE_INFO *enc_info)
+ {
+     int ret = -1;
++
++    /* adapter_module -- start*/
++    /*
++    ret = hal_adapter_get_enc_info(enc_sys_id, enc_info);
++    if(ret == 0)
++    {
++        return ret;
++    }
++    */
++    HAL_MODULE_ADAPTER(hal_adapter_get_enc_info(enc_sys_id, enc_info));
++
++    /* adapter module -- end*/
++
+     memset(enc_info, 0, sizeof(ENCLOSURE_INFO));
+     if (!strcmp(enc_sys_id, ENC_ROOT_SYS_ID))
+         ret = root_getinfo(enc_info);
+@@ -15183,6 +15198,8 @@ int se_sys_set_ident_led(IN char *enc_sys_id, IN int enable)
+     int ret = -1;
+     UART_CMD_SPEC mcu_spec;
+ 
++    HAL_MODULE_ADAPTER(hal_adapter_set_identify_led(enc_sys_id, enable));
++
+     if (!strcmp(enc_sys_id, ENC_ROOT_SYS_ID)) //internal root enclosure
+     {
+         char buf[MAX_BUF_LEN];
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index 7462b761f68..58bb2a1ce97 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -3197,6 +3197,159 @@ DISK_IS_CEPH_OSD_END:
+ }
+ #endif
+ 
++
++int hal_util_get_se_sys_id(char *dev_sys_id, char *enc_sys_id)
++{
++    int ret = -1;
++    int retry_cnt = 20;
++    int cnt = 0;
++
++    while(cnt < retry_cnt)
++    {
++        ret =  PD_Sys_Get_SE_Sys_Id(dev_sys_id, enc_sys_id);
++        if(ret == -2)
++        {
++            ret = PD_Sys_Get_TLSATA_Enc_Sys_ID(dev_sys_id, enc_sys_id);
++        }
++
++        if(ret == 0)
++        {
++            return ret;
++        }
++
++        if(ret == -3)
++        {
++            UTIL_Debug(TRACE_WARNING, "%s(%d):dev_sys_id = %s not exist, maybe enclosure plug out, exit it.\n",__func__, __LINE__, dev_sys_id);
++            return ret;
++        }
++
++        cnt += 1;
++        sleep(1);               
++    }
++
++    UTIL_Debug(TRACE_INFO, "Get enc_sys_id: (ret, retry_cnt) = (%d, %d,)\n", ret, retry_cnt);    
++    return ret;
++}
++
++int hal_util_is_pd_attached(char *dev_sys_id, char *enc_sys_id)
++{
++    int ret;
++    int enc_id, port_id;
++    ENC_MONITOR_OBJ *enc = NULL;
++    PD_MONITOR_OBJ *pd = NULL;
++    
++    ret = PD_Get_Id_By_Sys_Id(enc_sys_id, dev_sys_id, &enc_id, &port_id);
++    if(ret != 0)
++    {
++        return ret;
++    }
++
++    //check if PD already exist in hal_daemon 
++    if(port_id >= SR_MEMBER_PORTID_OFFSET)
++        port_id = port_id/SR_MEMBER_PORTID_OFFSET;
++
++    pthread_mutex_lock(&hal_util_mutex);
++    ret = find_pd_from_dev_id(enc_id, port_id, &enc, &pd);
++    pthread_mutex_unlock(&hal_util_mutex);
++    return ret;
++}
++
++int hal_util_is_iscsi_enc(char *dev_sys_id, char *enc_sys_id)
++{
++    char value[32] = {0};
++
++    if (SE_Get_ISCSI_Enc_Sys_ID(value, sizeof(value)) != NULL) 
++    {
++        if (!strncmp(enc_sys_id, value, strlen(value)) && PD_Sys_Is_In_ISCSI_Enc(dev_sys_id) == 0)
++        {
++            UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s end\n",__func__, __LINE__, dev_sys_id);
++            return 0;
++        }
++    }
++    return -1;
++}
++
++int hal_util_pd_sys_attach(char *dev_sys_id, char *enc_sys_id)
++{
++    int ret;
++    char value[32] = {0};
++
++    ret = PD_Sys_Attach(enc_sys_id, dev_sys_id);
++    if (ret == 0)
++    {
++        UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s enc_sys_id = %s\n",__func__, __LINE__, dev_sys_id, enc_sys_id);    
++        return ret;
++    }
++
++    if(ret == -2)
++    {
++        UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s end, ret = %d\n",__func__, __LINE__, dev_sys_id, ret);
++        return ret;
++    }
++
++    if (ret != -2)
++    {
++        // check for iscsi, value is got iscsi enclosure name before. Do not use value between here and SE_Get_ISCSI_Enc_Sys_ID()
++        // do not need PD_Sys_Is_In_ISCSI_Enc() because break before.
++        SE_Get_ISCSI_Enc_Sys_ID(value, sizeof(value)); 
++        if (!strncmp(enc_sys_id, value, strlen(value)))
++        {
++            SE_Set_Sound_Alert(0, VOICE_HDD_ERROR);
++            UTIL_Debug(TRACE_WARNING, "%s(%d) iscsi attached driver more than MAX support %s.\n", __func__, __LINE__, dev_sys_id);
++            UTIL_Send_Event_Log(EVENT_TYPE_ERROR,"Attached Virtual JBOD disk inaccessible or more than maximum supported.");
++        }
++        else if ((type = sg_get_type(dev_sys_id)) < 0)
++        {
++            UTIL_Debug(TRACE_WARNING, "%s(%d)Get a type of drive %s failure.\n", __func__,__LINE__,dev_sys_id);
++        }
++        else if (type == TYPE_DISK)
++        {
++            SE_Set_Sound_Alert(0, VOICE_HDD_ERROR);
++            UTIL_Debug(TRACE_WARNING, "%s(%d)A broken drive %s plug in,ignore it.\n", __func__,__LINE__,dev_sys_id);
++            UTIL_Send_NC_Log(NC_A049_C009_41, "[{0}] Failed to access the installed drive. Check the drive for errors.", NULL);
++        }
++        else
++        {
++            UTIL_Debug(TRACE_WARNING, "%s(%d)A type %d of drive %s plug in,ignore it.\n", __func__,__LINE__,type,dev_sys_id);
++        }
++    }
++}
++
++int hal_util_pd_get_id_by_sys_id(char *enc_sys_id, char *dev_sys_id, int *enc_id, int *port_id)
++{
++    int ret;
++    int find = 0;
++
++    ret = PD_Get_Id_By_Sys_Id(enc_sys_id, dev_sys_id, enc_id, port_id);
++    if (ret < 0)
++    {
++        UTIL_Debug(TRACE_ERROR, "%s(%d): System Error.\n",__func__, __LINE__);    
++        return ret;
++    }
++
++    if (PD_Get_SR_Mode(*enc_id, *port_id) != PD_NON_SR_MODE)
++        Get_SR_Virtual_PortId(port_id);
++
++    UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,enc_id = %d, port_id = %d\n",__func__, __LINE__, *enc_id, *port_id);
++
++    pthread_mutex_lock(&hal_util_mutex);
++    list_for_each_entry(enc, &enc_head, enc_node)
++    {
++        if (enc->enc_id == enc_id)
++        {
++            find = 1;
++            break;
++        }
++    }
++
++    if (find == 0)
++    {
++        pthread_mutex_unlock(&hal_util_mutex);
++        UTIL_Debug(TRACE_ERROR, "%s(%d):dev_sys_id = %s can't find SE\n",__func__, __LINE__, dev_sys_id);    
++        break;
++    }
++}
++
+ static int pd_evt_func(EVT_FUNC_ARG arg)
+ {
+     int enc_id, port_id, dev_id;
+@@ -3247,153 +3400,47 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+             //called by udev
+             dev_sys_id = arg.param.add_remove.dev_sys_id;
+             UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s start\n",__func__, __LINE__, dev_sys_id);    
+-            //get enc_sys_id    
+-            enc_sys_id = enc_sys_id_buf;
+-
+-            do
+-            {
+-                ret =  PD_Sys_Get_SE_Sys_Id(dev_sys_id, enc_sys_id);
+-                if (ret == -2)
+-                {
+-                    if (PD_Sys_Get_TLSATA_Enc_Sys_ID(dev_sys_id, enc_sys_id) == 0)
+-                    {
+-                        ret = 0;
+-                    }
+-                    else
+-                    {
+-                        if (retry < 20)
+-                        {
+-                            sleep(1);
+-                            ret = -1;
+-                            UTIL_Debug(TRACE_WARNING, "%s(%d):dev_sys_id = %s enc_sys_id %s. retry %d\n",__func__, __LINE__, dev_sys_id, enc_sys_id, retry);
+-                        }
+-                        else
+-                            return 0;
+-                    }
+-                }
+-                else
+-                if (ret == -3)
+-                {
+-                    UTIL_Debug(TRACE_WARNING, "%s(%d):dev_sys_id = %s not exist, maybe enclosure plug out, exit it.\n",__func__, __LINE__, dev_sys_id);
+-                    return 0;
+-                }
+-                else if(ret != 0)
+-                    sleep(1);               
+-            } while(ret != 0 && retry++ < 20);
+ 
+-            if (retry >= 20)
++            enc_sys_id = enc_sys_id_buf;
++            ret = hal_util_get_se_sys_id(dev_sys_id, enc_sys_id);
++            if(ret != 0)
+             {
+-                UTIL_Debug(TRACE_WARNING, "%s(%d):dev_sys_id = %s wait SE too long\n",__func__, __LINE__, dev_sys_id);    
+-                break;
++                return ret;
+             }
+-            // enc_sys_id=root for NAS itself.
+-            UTIL_Debug(TRACE_INFO, "%s(%d):Get enc_sys_id complete:dev_sys_id = %s ,enc_sys_id = %s\n",__func__, __LINE__, dev_sys_id,enc_sys_id);    
+             
+-            //check if PD already exist in /etc/enclosure_x.conf
+-            if (PD_Get_Id_By_Sys_Id(enc_sys_id, dev_sys_id, &enc_id, &port_id) == 0)
++            ret = hal_util_is_pd_attached(dev_sys_id, enc_sys_id)
++            if(ret == 0)
+             {
+-                if(port_id >= SR_MEMBER_PORTID_OFFSET)
+-                   port_id = port_id/SR_MEMBER_PORTID_OFFSET;
+-
+-                pthread_mutex_lock(&hal_util_mutex);
+-                //check if PD already exist in hal_daemon 
+-                if (find_pd_from_dev_id(enc_id, port_id, &enc, &pd) == 0)
+-                {
+-                    UTIL_Debug(TRACE_INFO, "%s(%d):PD %s already ATTACH.\n",__func__, __LINE__, dev_sys_id);    
+-                    pthread_mutex_unlock(&hal_util_mutex);
+-                    break;
+-                }
+-                pthread_mutex_unlock(&hal_util_mutex);
+-            } 
+-            
+-            // using value to get iscsi enclosure name
+-            if (SE_Get_ISCSI_Enc_Sys_ID(value, sizeof(value)) != NULL) 
+-            {
+-                if (!strncmp(enc_sys_id, value, strlen(value)) && PD_Sys_Is_In_ISCSI_Enc(dev_sys_id) == 0)
+-                {
+-                    UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s end\n",__func__, __LINE__, dev_sys_id);
+-                    break;
+-                }
++                return ret;
+             }
+-            else
++            
++            ret = hal_util_is_iscsi_enc();
++            if(ret == 0)
+             {
+-                UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH, can not get iscsi enclosure name\n",__func__, __LINE__);
+-                UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s end\n",__func__, __LINE__, dev_sys_id);    
+-                break;
+-                
++                return ret;
+             }
+-                
+-            //add SE ,fail if already exist
++
+             SE_Sys_Attach(enc_sys_id, 0); 
+ 
+-            if (UTIL_JBOD_Add(enc_sys_id,arg.param.add_remove.time_stamp) < 0)
++            ret = UTIL_JBOD_Add(enc_sys_id,arg.param.add_remove.time_stamp)
++            if(ret < 0)
+             {
+                 UTIL_Debug(TRACE_ERROR, "%s(%d):PD ATTACH,dev_sys_id = %s end\n",__func__, __LINE__, enc_sys_id);    
+-                break;
++                return ret;
+             }
+             
+-            if ((ret = PD_Sys_Attach(enc_sys_id, dev_sys_id)) < 0)
++            ret = hal_util_pd_sys_attach(dev_sys_id, enc_sys_id);
++            if(ret != 0)
+             {
+-                if (ret != -2)
+-                {
+-                    // check for iscsi, value is got iscsi enclosure name before. Do not use value between here and SE_Get_ISCSI_Enc_Sys_ID()
+-                    // do not need PD_Sys_Is_In_ISCSI_Enc() because break before.
+-                    if (!strncmp(enc_sys_id, value, strlen(value)))
+-                    {
+-                        SE_Set_Sound_Alert(0, VOICE_HDD_ERROR);
+-                        UTIL_Debug(TRACE_WARNING, "%s(%d) iscsi attached driver more than MAX support %s.\n", __func__, __LINE__, dev_sys_id);
+-                        UTIL_Send_Event_Log(EVENT_TYPE_ERROR,"Attached Virtual JBOD disk inaccessible or more than maximum supported.");
+-                    }
+-                    else if ((type = sg_get_type(dev_sys_id)) < 0)
+-                    {
+-                        UTIL_Debug(TRACE_WARNING, "%s(%d)Get a type of drive %s failure.\n", __func__,__LINE__,dev_sys_id);
+-                    }
+-                    else if (type == TYPE_DISK)
+-                    {
+-                        SE_Set_Sound_Alert(0, VOICE_HDD_ERROR);
+-                        UTIL_Debug(TRACE_WARNING, "%s(%d)A broken drive %s plug in,ignore it.\n", __func__,__LINE__,dev_sys_id);
+-                        UTIL_Send_NC_Log(NC_A049_C009_41, "[{0}] Failed to access the installed drive. Check the drive for errors.", NULL);
+-                    }
+-                    else
+-                    {
+-                        UTIL_Debug(TRACE_WARNING, "%s(%d)A type %d of drive %s plug in,ignore it.\n", __func__,__LINE__,type,dev_sys_id);
+-                    }
+-                }
+-                UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s end, ret = %d\n",__func__, __LINE__, dev_sys_id, ret);
+-                break;
++                return ret;
+             }
+-            UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,dev_sys_id = %s enc_sys_id = %s\n",__func__, __LINE__, dev_sys_id, enc_sys_id);    
+-
+-            //get enc_id,port_id
+-            ret = PD_Get_Id_By_Sys_Id(enc_sys_id, dev_sys_id, &enc_id, &port_id);
+-            UTIL_Debug(TRACE_INFO, "%s(%d): get id enc_id = %d, port_id = %d\n",__func__, __LINE__, enc_id, port_id);
+-            if (PD_Get_SR_Mode(enc_id, port_id) != PD_NON_SR_MODE)
+-                Get_SR_Virtual_PortId(&port_id);
+ 
+-            UTIL_Debug(TRACE_INFO, "%s(%d):PD ATTACH,enc_id = %d, port_id = %d\n",__func__, __LINE__, enc_id, port_id);
+-            if (ret < 0)
++            ret = hal_util_pd_get_id_by_sys_id(enc_sys_id, dev_sys_id, &enc_id, &port_id);
++            if(ret != 0)
+             {
+-                UTIL_Debug(TRACE_ERROR, "%s(%d): System Error.\n",__func__, __LINE__);    
+-                break;
++                return ret;
+             }
+-            pthread_mutex_lock(&hal_util_mutex);
+ 
+-            find = 0;
+-            list_for_each_entry(enc, &enc_head, enc_node)
+-            {
+-                if (enc->enc_id == enc_id)
+-                {
+-                    find = 1;
+-                    break;
+-                }
+-            }
+-            
+-            if (find == 0)
+-            {
+-                pthread_mutex_unlock(&hal_util_mutex);
+-                UTIL_Debug(TRACE_ERROR, "%s(%d):dev_sys_id = %s can't find SE\n",__func__, __LINE__, dev_sys_id);    
+-                break;
+-            }
+             enc_time_stamp = enc->time_stamp;
+             // Note that enc is init in se_add() and added into list 
+             if(UTIL_Test_ENC_Flag(enc, ENC_IN_STANDBY))

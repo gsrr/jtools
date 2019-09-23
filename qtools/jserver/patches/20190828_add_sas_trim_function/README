@@ -1,0 +1,3 @@
+title=[Bug 226215] [Samsung MZILT960HAHQ][TVS-EC1680U-SAS] SSD的資訊顯示不支援 SSD Trim功能
+model=TS-ALL
+description=add_sas_trim_function

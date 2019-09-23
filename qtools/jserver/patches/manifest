@@ -1,5 +1,4 @@
 <?xml version="1.0"?>
 
 <manifest src="/datapool/git_qnap/" dst="172.17.22.179">
-  <project path="NasX86" name="NasX86" revision="localmaster-20190812_Ulink_NvmeSelfTestLog_size_error"/>
 </manifest>

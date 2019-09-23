@@ -1,0 +1,3 @@
+title=jira (QTSHERO0-1052) [Storage & Snapshots] Uploaded disk analysis data. Disk: Host，正常上傳但Log顯示為"警告"
+model=TS-ALL
+description=fix severity type from warn to info

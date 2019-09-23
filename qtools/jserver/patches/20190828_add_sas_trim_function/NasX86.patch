@@ -1,0 +1,402 @@
+diff --git a/NasLib/hal/Makefile b/NasLib/hal/Makefile
+index 2c80bd24181..be52c20a890 100755
+--- a/NasLib/hal/Makefile
++++ b/NasLib/hal/Makefile
+@@ -53,7 +53,7 @@ HAL_STATIC_LIB = libuLinux_hal.a
+ OBJS_HAL_LIB = hal_enc.o hal_pd.o hal_gpio.o hal_hm.o hal_net.o hal_prt.o hal_mb.o hal_resctrl.o \
+                hal_sys_pd.o hal_sys_enc.o hal_sys_sio.o hal_sys_common.o hal_sys_ich.o hal_sys_net.o hal_sys_prt.o hal_sys_pic.o hal_sys_mcu.o hal_sys_emcu.o hal_sys_uart.o\
+                hal_utils.o err_trace.o hal_sys_soc.o hal_sys_i2c.o hal_i2c.o hal_conf.o hal_sys_mem.o  hal_sys_ec.o hal_sys_pci.o hal_ipmi.o hal_sys_cpld.o hal_sys_qm2.o hal_sys_tbt.o\
+-               hal_sys_raidmgr.o hal_sys_raidapi.o hal_sys_scsi.o hal_sys_sw.o hal_fc.o hal_sys_fc.o
++               hal_sys_raidmgr.o hal_sys_raidapi.o hal_sys_scsi.o hal_sys_sw.o hal_fc.o hal_sys_fc.o hal_lib_sas.o
+ 
+ HAL_APP = hal_app
+ OBJS_HAL_TEST = hal_app.o
+diff --git a/NasLib/hal/hal_lib_sas.c b/NasLib/hal/hal_lib_sas.c
+new file mode 100644
+index 00000000000..529cc9d5d9a
+--- /dev/null
++++ b/NasLib/hal/hal_lib_sas.c
+@@ -0,0 +1,247 @@
++#include <stdio.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <getopt.h>
++#include <dirent.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <sys/ioctl.h>
++#include <scsi/sg.h> /* take care: fetches glibc's /usr/include/scsi/sg.h */
++
++#include "hal_lib_sas.h"
++
++unsigned short get_cmd_len(char *cmd_str)
++{
++    return (strlen(cmd_str) + 1)/3;
++}
++
++unsigned short buf_len_12h(unsigned char *cmd)
++{
++    return (cmd[3] << 8) + cmd[4];
++}
++
++unsigned short get_buf_len(char *cmd)
++{
++    if(cmd[0] == 0x12)
++    {
++        return buf_len_12h(cmd);
++    }
++    return 0;
++}
++
++int chex_to_int(char c)
++{
++    if(c - 'a' >= 0)
++    {
++        return c - 'a' + 10;
++    }
++    return c - '0';
++}
++
++void cmd_str_to_buf(char *cmd_str, unsigned char *cmd)
++{
++    int i;
++    for(i = 0 ; i < strlen(cmd_str) ; i += 3)
++    {
++        cmd[i/3] = (chex_to_int(cmd_str[i]) << 4) + chex_to_int(cmd_str[i + 1]);
++    }
++}
++
++int _send_scsi_command(char *dev, unsigned short cmd_len,unsigned char *cmd, unsigned short buf_len, unsigned char *buf)
++{
++    int ret = 0;
++    int sg_fd;
++    sg_io_hdr_t io_hdr;
++    unsigned char sense_buffer[32];
++
++    if ((sg_fd = open(dev, O_RDONLY)) < 0) {
++        perror("error opening given file name");
++        return -1;
++    }
++
++    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
++    io_hdr.interface_id = 'S';
++    io_hdr.cmd_len = cmd_len;
++    io_hdr.mx_sb_len = sizeof(sense_buffer);
++    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
++    io_hdr.dxfer_len = buf_len;
++    io_hdr.dxferp = buf;
++    io_hdr.cmdp = cmd;
++    io_hdr.sbp = sense_buffer;
++    io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
++
++    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
++        perror("sg_simple0: Inquiry SG_IO ioctl error");
++        ret = -1;
++        goto send_exit;
++    }
++    
++    if ((io_hdr.info & SG_INFO_OK_MASK) != SG_INFO_OK) 
++    {
++        ret = -1;
++        goto send_exit;
++    }
++
++send_exit:
++    close(sg_fd);
++    return ret;
++
++}
++
++void dump_buf(unsigned char *buf)
++{
++    int i;
++    for(i = 0 ; i < 0x60 ; i++)
++    {
++        printf("%02x ", buf[i]);
++    }
++    printf("\n");
++}
++
++void parsebuf_12h_01h_00h(unsigned char *buf, void *data)
++{
++    int i;
++    struct scsi_12_01_00 *vpd = (struct scsi_12_01_00*) data;
++
++    vpd->page_code = buf[1];
++    vpd->page_length = (buf[2] << 8) + buf[3];
++
++    vpd->sup_pages = malloc(vpd->page_length);
++    for(i = 0 ; i < vpd->page_length ; i++)
++    {
++        vpd->sup_pages[i] = buf[4 + i];
++    }
++}
++
++void parsebuf_12h_01h_b2h(unsigned char *buf, void *data)
++{
++    int i;
++    struct scsi_12_01_b2 *vpd = (struct scsi_12_01_b2*) data;
++
++    vpd->page_code = buf[1];
++    vpd->page_length = (buf[2] << 8) + buf[3];
++    vpd->lbpw = (buf[5] >> 4) & 0x0e;
++    vpd->lbpr = (buf[5] >> 2) & 1;
++}
++
++int send_scsi_command(char *dev, char *cmd_str, void *data, void(*parsefunc)(unsigned char*, void*))
++{
++    int ret = 0;
++    unsigned short int cmd_len;
++    unsigned short int buf_len;
++    unsigned char *cmd;
++    unsigned char *buf;
++
++    cmd_len = get_cmd_len(cmd_str);
++    cmd = malloc(cmd_len);
++    cmd_str_to_buf(cmd_str, cmd);
++
++    buf_len = get_buf_len(cmd);
++    buf = malloc(buf_len);
++    
++    ret = _send_scsi_command(dev, cmd_len, cmd, buf_len, buf);
++    if(ret == 0)
++    {
++        parsefunc(buf, data);
++        //dump_buf(buf);
++    }
++    free(cmd);
++    free(buf);
++    return ret;
++}
++
++int is_sas_support_trim(char *dev)
++{
++    int ret = 0;
++    int i;
++    struct scsi_12_01_00 data;
++    ret = send_scsi_command(dev, "12,01,00,00,60,00", &data, parsebuf_12h_01h_00h);
++    if(ret != 0)
++        return 0;
++
++    for(i = 0 ; i < data.page_length ; i++)
++    {
++        if(data.sup_pages[i] == 0xb2)
++            ret += 1;
++        if(data.sup_pages[i] == 0xb0)
++            ret += 1;
++    }
++    
++    if(data.page_length > 0)
++    {
++        free(data.sup_pages);
++    }
++
++    if (ret == 2)
++    {
++        return 1;
++    }
++    return 0;
++}
++
++int is_sas_support_trim_write(char *dev)
++{
++    int ret = 0;
++    int i;
++    struct scsi_12_01_b2 data;
++    ret = send_scsi_command(dev, "12,01,b2,00,08,00", &data, parsebuf_12h_01h_b2h);
++    if(ret != 0)
++        return 0;
++
++    if(data.lbpw != 0)
++        return 1;
++    return 0;
++}
++
++int is_sas_support_trim_read_zero(char *dev)
++{
++    int ret = 0;
++    int i;
++    struct scsi_12_01_b2 data;
++    ret = send_scsi_command(dev, "12,01,b2,00,08,00", &data, parsebuf_12h_01h_b2h);
++    if(ret != 0)
++        return 0;
++
++    if(data.lbpr != 0)
++        return 1;
++    return 0;
++}
++
++#ifdef UNIT_TEST
++void test_vpd_page_00(char *dev, char *cmd_str)
++{
++    struct scsi_12_01_00 data;
++    send_scsi_command(dev, cmd_str, &data, parsebuf_12h_01h_00h);
++    printf("page code:%d\n", data.page_code);
++    printf("page length:%d\n", data.page_length);
++
++    int i;
++    printf("support pages: ");
++    for(i = 0 ; i < data.page_length ; i++)
++    {
++        printf("%02x ", data.sup_pages[i]);
++    }
++    printf("\n");
++}
++
++void test_vpd_page_b2(char *dev, char *cmd_str)
++{
++    struct scsi_12_01_b2 data;
++    send_scsi_command(dev, cmd_str, &data, parsebuf_12h_01h_b2h);
++    printf("page code:%d\n", data.page_code);
++    printf("page length:%d\n", data.page_length);
++    printf("lbpw : %d\n", data.lbpw);
++    printf("lbpr : %d\n", data.lbpr);
++    printf("\n");
++}
++
++int main(int argc, char * argv[])
++{
++    //send_scsi_command(argv[1], "12,00,00,00,60,00");
++    //test_vpd_page_00(argv[1], argv[2]);
++    test_vpd_page_b2(argv[1], argv[2]);
++    return 0;
++}
++#endif
+diff --git a/NasLib/hal/hal_lib_sas.h b/NasLib/hal/hal_lib_sas.h
+new file mode 100644
+index 00000000000..f55910c55d8
+--- /dev/null
++++ b/NasLib/hal/hal_lib_sas.h
+@@ -0,0 +1,20 @@
++
++
++int is_sas_support_trim(char *ctrl_name);
++int is_sas_support_trim_write(char *ctrl_name);
++int is_sas_support_trim_read_zero(char *ctrl_name);
++
++struct scsi_12_01_00
++{
++    unsigned char page_code;
++    unsigned short page_length;
++    unsigned char *sup_pages;
++};
++
++struct scsi_12_01_b2
++{
++    unsigned char page_code;
++    unsigned short page_length;
++    unsigned char lbpw;
++    unsigned char lbpr;
++};
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index 9af7f991538..4c82b150d77 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -38,6 +38,7 @@
+ #include "hal_sys_raidapi.h"
+ #include "hal_enc.h"
+ #include "hal_da_util.h"
++#include "hal_lib_sas.h"
+ 
+ typedef struct _NVME_PASSTHRU_CMD
+ {
+@@ -6398,6 +6399,22 @@ static int getinfo_pd_on_sr_member(
+     return ret;
+ }
+ 
++void sas_setup_trim(PD_INFO *pd_info)
++{
++    if(is_sas_support_trim(pd_info->pd_ctrl_name) == 1)
++    {
++        if(is_sas_support_trim_write(pd_info->pd_ctrl_name) == 1)
++        {
++            pd_info->capabilities |= PD_CAP_TRIM;
++            if(is_sas_support_trim_read_zero(pd_info->pd_ctrl_name) == 1)
++            {
++                pd_info->capabilities |= PD_CAP_DZAT;
++            }
++        }
++    }
++    ERR_TRACE(TRACE_ERROR, "%s: (dev, lbpw, lbpr) = (%s, %d, %d)\n", __func__,pd_info->pd_ctrl_name, pd_info->capabilities & PD_CAP_TRIM, pd_info->capabilities & PD_CAP_DZAT);
++}
++
+ static int getinfo_pd_in_root_enclosure(IN char *enc_sys_id, IN char *pd_sys_id, OUT PD_INFO *pd_info)
+ {
+     int ret = -1, res = -1;
+@@ -6676,9 +6693,6 @@ static int getinfo_pd_in_root_enclosure(IN char *enc_sys_id, IN char *pd_sys_id,
+         {
+             //SAS drive
+             char resp[256];
+-            PD_NVME_ID_CTRL nvme_id_ctrl;
+-            unsigned short int nvme_oncs = 0;
+-            memset(&nvme_id_ctrl, 0x0, sizeof(PD_NVME_ID_CTRL));
+ 
+             pd_info->type = PD_SAS;
+             pd_info->capabilities |= PD_CAP_PHY_ERROR_PAGE;
+@@ -6701,35 +6715,27 @@ static int getinfo_pd_in_root_enclosure(IN char *enc_sys_id, IN char *pd_sys_id,
+             else
+                 pd_info->capabilities &= ~PD_CAP_SSD;
+             get_sas_form_factor(pd_info->pd_ctrl_name, &pd_info->form);
+-            if (strncmp(pd_sys_id, "nvme", strlen("nvme")))
+-            {
+-                ret = get_sas_target_device_address(pd_info->pd_ctrl_name, pd_info->wwn, &pd_info->wwn_len);
+-                if (ret < 0)
+-                    pd_info->capabilities &= ~PD_CAP_WWN;
+-                else
+-                    pd_info->capabilities |= PD_CAP_WWN;
+ 
+-                if (pd_sys_set_sas_warning(enc_sys_id, pd_sys_id) < 0)
+-                    ERR_TRACE(TRACE_ERROR, "%s(%d): pd_sys_id = %s,Set SAS WARNING function fail\n", __func__, __LINE__, pd_sys_id);
+-            }
++            ret = get_sas_target_device_address(pd_info->pd_ctrl_name, pd_info->wwn, &pd_info->wwn_len);
++            if (ret < 0)
++                pd_info->capabilities &= ~PD_CAP_WWN;
++            else
++                pd_info->capabilities |= PD_CAP_WWN;
++
++            if (pd_sys_set_sas_warning(enc_sys_id, pd_sys_id) < 0)
++                ERR_TRACE(TRACE_ERROR, "%s(%d): pd_sys_id = %s,Set SAS WARNING function fail\n", __func__, __LINE__, pd_sys_id);
++
+             ret = get_sas_pwr_standby_support(pd_info->pd_ctrl_name);
+             if (ret < 0)
+                 pd_info->capabilities &= ~PD_CAP_PWR_STANDBY;
+             else
+                 pd_info->capabilities |= PD_CAP_PWR_STANDBY;
++
+             ret = get_sas_capacity(pd_info->pd_ctrl_name, &pd_info->capacity, &pd_info->sector_size);
+             //Set "READY LED MEANING" in  9.2.7.4 of SAS Protocol Layer(SPL)
+             set_sas_ready_led(enc_sys_id, pd_sys_id, 1);
+ 
+-            if (pd_sys_get_nvme_ident(enc_sys_id, pd_sys_id, &nvme_id_ctrl) >= 0)
+-            {
+-                //printf("NVME %s Model Number : %s\n", pd_sys_id, nvme_id_ctrl.mn);
+-                //printf("NVME %s ONCS(Optional NVM Command Support) : 0x%x\n", __func__, pd_sys_id, nvme_id_ctrl.oncs[1] << 8 | nvme_id_ctrl.oncs[0]);
+-                nvme_oncs = nvme_id_ctrl.oncs[1] << 8 | nvme_id_ctrl.oncs[0];
+-                if (nvme_oncs & NVME_CAP_ONCS_SUPPORT_DATASET_MANAGEMENT)
+-                    pd_info->capabilities |= PD_CAP_TRIM;
+-                ret = 0;
+-            }
++            sas_setup_trim(pd_info);
+         }
+     }
+     else if (!strcmp(enc_sys_id, ENC_ROOT_USB_SYS_ID))
+@@ -6953,7 +6959,8 @@ static int getinfo_pd_in_pcie_enclosure(IN char *enc_sys_id, IN char *pd_sys_id,
+             pd_info->capabilities |= PD_CAP_CACHEABLE;
+             // Set rotation speed as 0
+             pd_info->rotation_speed = 0;
+-
++            
++            sas_setup_trim(pd_info);
+             count = enumerate_pd_in_root_enclosure(enc_sys_id, enc_pd_id, 32);
+             for (i = 0; i< count; i++)
+             {
+@@ -8547,6 +8554,7 @@ static int getinfo_pd_in_sas_expander(IN char *enc_sys_id, IN char *pd_sys_id, O
+         if (pd_sys_set_sas_warning(enc_sys_id, pd_sys_id) < 0)
+             ERR_TRACE(TRACE_ERROR, "%s(%d): pd_sys_id = %s,Set SAS WARNING function fail\n", __func__, __LINE__, pd_sys_id);
+             
++        sas_setup_trim(pd_info);
+     }
+ 
+     /* SR */

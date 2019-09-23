@@ -1,0 +1,31 @@
+diff --git a/NasUtil/hal_util/hal_util_pd.c b/NasUtil/hal_util/hal_util_pd.c
+index 7fb6ff4421e..9aadec88f5b 100755
+--- a/NasUtil/hal_util/hal_util_pd.c
++++ b/NasUtil/hal_util/hal_util_pd.c
+@@ -4500,7 +4500,7 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+             netlink_ata_qc = &arg.param.netlink_pd_ata_qc_err;
+             ret = find_pd_from_scsi_bus(netlink_ata_qc->scsi_bus, &enc, &pd);
+             if(ret != 0){
+-                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_ATA_QC_ERROR:can't find device\n", netlink_ata_qc->scsi_bus[0], netlink_ata_qc->scsi_bus[1], netlink_ata_qc->scsi_bus[3], netlink_ata_qc->scsi_bus[4]);    
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_ATA_QC_ERROR:can't find device\n", netlink_ata_qc->scsi_bus[0], netlink_ata_qc->scsi_bus[1], netlink_ata_qc->scsi_bus[2], netlink_ata_qc->scsi_bus[3]);    
+             } 
+             else
+             {
+@@ -4514,7 +4514,7 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+             ret = find_pd_from_scsi_bus(netlink_scsi_cmd->scsi_bus, &enc, &pd);
+             if(ret != 0)
+             {
+-                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_scsi_cmd->scsi_bus[0], netlink_scsi_cmd->scsi_bus[1], netlink_scsi_cmd->scsi_bus[3], netlink_scsi_cmd->scsi_bus[4]);    
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_scsi_cmd->scsi_bus[0], netlink_scsi_cmd->scsi_bus[1], netlink_scsi_cmd->scsi_bus[2], netlink_scsi_cmd->scsi_bus[3]);    
+             } 
+             else
+             {
+@@ -4528,7 +4528,7 @@ static int pd_evt_func(EVT_FUNC_ARG arg)
+             ret = find_pd_from_scsi_bus(netlink_ata_link->scsi_bus, &enc, &pd);
+             if(ret != 0)
+             {
+-                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_ata_link->scsi_bus[0], netlink_ata_link->scsi_bus[1], netlink_ata_link->scsi_bus[3], netlink_ata_link->scsi_bus[4]);    
++                UTIL_Debug(TRACE_WARNING, "[%d:%d:%d:%d] SET_PD_SCSI_CMD_ERROR:can't find device\n", netlink_ata_link->scsi_bus[0], netlink_ata_link->scsi_bus[1], netlink_ata_link->scsi_bus[2], netlink_ata_link->scsi_bus[3]);    
+             } 
+             else
+             {

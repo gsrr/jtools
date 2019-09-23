@@ -1,0 +1,67 @@
+diff --git a/NasLib/hal/hal_sys_pd.c b/NasLib/hal/hal_sys_pd.c
+index ff10ae81d92..ced15505fca 100755
+--- a/NasLib/hal/hal_sys_pd.c
++++ b/NasLib/hal/hal_sys_pd.c
+@@ -15418,6 +15418,52 @@ void da_iotest(int enc_id, int port_id)
+     system(cmd);
+ }
+ 
++int da_copy_from_file(FILE *output, char *src)
++{
++    FILE *input = NULL;
++    char c;
++
++    input = fopen(src, "r");
++    if(input == NULL) 
++    { 
++        ERR_TRACE(TRACE_ERROR, "da_copy_from_file, Can not open file (file) = (%s)\n", src);
++        return -1;
++    } 
++
++    c = fgetc(input); 
++    while (c != EOF) 
++    { 
++        fputc(c, output); 
++        c = fgetc(input); 
++    } 
++    fclose(input);
++    return 0;
++}
++
++FILE* da_open_with_header(int enc_id, int port_id, char *disk_data_tmpfile)
++{
++    int ret = -1;
++    FILE *output = NULL;
++    char *tmpfile = "/tmp/sata_disk_header.tmp";
++
++    da_generate_header(enc_id, port_id, "SATA", tmpfile);
++
++    output = fopen(disk_data_tmpfile, "w");
++    if(output == NULL) 
++    { 
++        ERR_TRACE(TRACE_ERROR, "Can not open file (enc_id, port_id, file) = (%d, %d, %s)\n", enc_id, port_id, disk_data_tmpfile);
++        return NULL;
++    } 
++    ret = da_copy_from_file(output, tmpfile);
++    if(ret != 0)
++    {
++        ERR_TRACE(TRACE_ERROR, "da_open_with_header, error in copy file\n");
++        fclose(output);
++        return NULL;
++    }
++    return output;
++}
++
+ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_id, IN int port_id)
+ {
+     struct ata_smart_attribute *attribute_entry;
+@@ -15596,8 +15642,7 @@ int pd_sys_get_data_package(IN char *enc_sys_id, IN char *pd_sys_id, IN int enc_
+         if (stat(PD_SMART_TMP_DIR, &statbuf) >= 0)
+         {
+             snprintf(disk_data_tmpfile, sizeof(disk_data_tmpfile), DISK_DATA_PATH, enc_id, port_id);
+-            da_generate_header(enc_id, port_id, "SATA", disk_data_tmpfile);
+-            pOutput_File = fopen(disk_data_tmpfile, "a");
++            pOutput_File = da_open_with_header(enc_id, port_id, disk_data_tmpfile);
+ 
+             /* Here's the start of the meaningful data header. */
+ 
