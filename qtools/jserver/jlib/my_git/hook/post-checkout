@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import sys
 import os
 import my_git
 import xml.etree.cElementTree as ET
@@ -29,9 +30,10 @@ def copy_default_files(paras):
         dst = "%s/%s"%(paras['patchdir'], f)
         if os.path.exists(dst) == False:
             os.system("cp %s %s"%(src, dst))
+    return 0
 
 #  <project path="NasX86" name="NasX86" revision="localmaster-20190812_Ulink_NvmeSelfTestLog_size_error"/>
-def update_manifest(paras)
+def update_manifest(paras):
     f = "%s/manifest"%(paras['patchdir'])
     repo_name = os.path.splitext(my_git.get_repo_name())[0]
     tree = ET.ElementTree(file = f)
@@ -39,15 +41,20 @@ def update_manifest(paras)
     for c in root:
         if c.attrib['name'] != repo_name:
             continue
+        if len(c.attrib['revision']) != 0:
+            return -1
         c.attrib["revision"] = my_git.get_branch_name()
-    tree.write(manifest)
+    tree.write(f)
+    return 0
 
 def update_default_files(paras):
-    files = ['README', 'manifest']
+    files = ['manifest']
     for f in files:
         func = getattr(sys.modules[__name__], "update_" + f)
-        if func:
-            func(paras)
+        ret = func(paras)
+        if ret != 0:
+            return ret
+    return 0
 
 def main():
     cmds = [
@@ -59,9 +66,9 @@ def main():
     paras = {}
     for cmd in cmds:
         ret = cmd(paras)
+        print (ret, cmd)
         if ret != 0:
             break
-        print ret, cmd
     print (paras)
 
 if __name__ == "__main__":
