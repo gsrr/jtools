@@ -4,43 +4,73 @@ import os
 import my_git
 import xml.etree.cElementTree as ET
 
-patches_dir = '/datapool/qtools/jserver/patches/'
+patchrepo = '/datapool/qtools/jserver/patches/'
+
+def is_branch_name_valid(paras):
+    branch_name = my_git.get_branch_name()
+    if my_git.is_branch_name_valid(branch_name) == False:
+        return -1
+    paras['branch_name'] = branch_name
+    return 0
+
+def create_patchdir(paras):
+    branch_name = my_git.get_branch_name()
+    dirname = branch_name.split("-", 1)[1]
+    patchdir = "%s/%s"%(patchrepo, dirname)
+    if os.path.exists(patchdir) == False:
+        os.mkdir(patchdir)
+    paras['patchdir'] = patchdir
+    return 0
+
+def copy_default_files(paras):
+    files = ['README', 'manifest']
+    for f in files:
+        src = "%s/%s"%(patchrepo, f)
+        dst = "%s/%s"%(paras['patchdir'], f)
+        if os.path.exists(dst) == False:
+            os.system("cp %s %s"%(src, dst))
 
 #  <project path="NasX86" name="NasX86" revision="localmaster-20190812_Ulink_NvmeSelfTestLog_size_error"/>
-def update_manifest(branch, manifest):
-    repo_name = my_git.get_repo_name()
-    tree = ET.ElementTree(file=manifest)
+def update_manifest(paras)
+    f = "%s/manifest"%(paras['patchdir'])
+    repo_name = os.path.splitext(my_git.get_repo_name())[0]
+    tree = ET.ElementTree(file = f)
     root = tree.getroot()
+    for c in root:
+        if c.attrib['name'] != repo_name:
+            continue
+        c.attrib["revision"] = my_git.get_branch_name()
+    tree.write(manifest)
+
+def update_default_files(paras):
+    files = ['README', 'manifest']
+    for f in files:
+        func = getattr(sys.modules[__name__], "update_" + f)
+        if func:
+            func(paras)
+
+def main():
+    cmds = [
+        is_branch_name_valid,
+        create_patchdir,
+        copy_default_files,
+        update_default_files,
+    ]
+    paras = {}
+    for cmd in cmds:
+        ret = cmd(paras)
+        if ret != 0:
+            break
+        print ret, cmd
+    print (paras)
+
+if __name__ == "__main__":
+    main()
+    '''
     c = ET.Element("project")
     c.attrib["path"] = os.path.splitext(repo_name)[0]
     c.attrib["name"] = os.path.splitext(repo_name)[0]
     c.attrib["revision"] = branch
     print (c)
     root.append(c)
-    tree.write(manifest)
-
-def main():
-    branch_name = my_git.get_branch_name()
-
-    if my_git.is_branch_name_valid(branch_name) == False:
-        return
-
-    patch_name = branch_name.split("-", 1)[1]
-    patch_dir = "%s/%s"%(patches_dir, patch_name)
-    if os.path.exists(patch_dir):
-        return
-
-    os.mkdir(patch_dir)
-    readme_src = "%s/README"%(patches_dir)
-    manifest_src = "%s/manifest"%(patches_dir)
-    readme_dst = "%s/README"%(patch_dir)
-    manifest_dst = "%s/manifest"%(patch_dir)
-
-    os.system("cp %s %s"%(readme_src, readme_dst))
-    os.system("cp %s %s"%(manifest_src, manifest_dst))
-    print (patch_dir)
-    update_manifest(branch_name, manifest_dst)
-    #update_readme(branch_name, readme_dst)
-
-if __name__ == "__main__":
-    main()
+    '''
