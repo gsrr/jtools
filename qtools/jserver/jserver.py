@@ -6,6 +6,8 @@ import glob
 import xml.etree.cElementTree as ET
 import subprocess
 from jlib import jconf 
+from jlib import jcmd
+from jlib import jpatch
 
 
 def get_patch_path():
@@ -85,35 +87,7 @@ def init():
         init_remote_client(host.strip(), gconf[section])
     rm_redund_mnt()
 
-def get_start_end_commid(repo):
-    cmd = "git reflog show --no-abbrev %s"%repo
-    lines = subprocess.getoutput(cmd).splitlines()
-    return (lines[0].split()[0], lines[-1].split()[0])
-
 # or "git diff $start..."
-def gen_patch_cmd(repo):
-    commid_end, commid_start = get_start_end_commid(repo)
-    cmd = "git diff %s..%s"%(commid_start, commid_end)
-    return cmd
-
-# python3 gen_commit_patch 1 (1 stands for bug number)
-def gen_commit_patch():
-    lconfig = jconf.get_local()
-    fpath = '%s/patches/%s'%(lconfig['jserver_path'], sys.argv[2])
-    tree = ET.ElementTree(file='%s/manifest'%fpath)
-    root = tree.getroot()
-    src = root.attrib['src']
-    basedir = os.getcwd()
-    for proj in root:
-        print (proj.tag, proj.attrib)
-        src_repo = "%s/%s"%(src, proj.attrib['name'])
-        tmpdir = os.getcwd()
-        os.chdir(src_repo)
-        cmd = gen_patch_cmd(proj.attrib['revision'])
-        print ("\tgenerate patch : %s"%(os.getcwd()))
-        os.system("%s > %s/%s.patch"%(cmd, fpath, proj.attrib['name']))
-        os.chdir(tmpdir)
-
 def gen_patch_cmd_with_remote(repo):
     cmd = "git diff origin/%s..HEAD"%repo
     return cmd
@@ -135,13 +109,6 @@ def gen_commit_patch_with_remote():
 
 def do_commit_patch():
     pass
-
-def read_manifest():
-    local = jconf.get_local()
-    fpath = '%s/patches/%s'%(local['jserver_path'], sys.argv[2])
-    tree = ET.ElementTree(file='%s/manifest'%fpath)
-    root = tree.getroot()
-    return root
 
 def read_file(rpath):
     dic = {}
@@ -207,36 +174,6 @@ def gen_new_number():
     os.system("cp %s/README %s"%(base_dir, dst_dir))
     print ("new number is %d"%max_ps)
 
-# patch -p1 -i ../CVE-2015-1038.patch
-def exec_patch():
-    bconfig = jconf.get_local()
-    lconfig = jconf.get_build_server()
-    root = read_manifest()
-    for proj in root:
-        cmd = "patch -p1 -i %s -d %s"
-        print (proj.attrib['path'], proj.attrib['name'])
-        patch_path = '%s/patches/%s/%s.patch'%(bconfig['jserver_path'], sys.argv[2], proj.attrib['name'])
-        target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])
-        cmd = cmd%(patch_path, target_path)
-        print (cmd)
-        os.system(cmd)
-
-# patch -R -p1 -i ../CVE-2015-1038.patch
-def reverse_patch():
-    bconfig = jconf.get_local()
-    lconfig = jconf.get_build_server()
-    root = read_manifest()
-    for proj in root:
-        cmd = "patch -R -p1 -i %s -d %s"
-        print (proj.attrib['path'], proj.attrib['name'])
-        patch_path = '%s/patches/%s/%s.patch'%(bconfig['jserver_path'], sys.argv[2], proj.attrib['name'])
-        if os.path.exists(patch_path) == False:
-            continue
-
-        target_path = "/mnt_%s/%s/%s/%s/"%(lconfig['host'], lconfig['working_dir'], lconfig['build_dir'], proj.attrib['path'])
-        cmd = cmd%(patch_path, target_path)
-        print (cmd)
-        os.system(cmd)
 
 def copy_patch():
     cmd = "rsync -a %s %s"
@@ -248,9 +185,14 @@ def copy_patch():
     os.system(cmd)
 
 def re_exec_patch():
-    reverse_patch()
-    gen_commit_patch()
-    exec_patch()
+    cmds = [
+        jpatch.reverse_patch,
+        jpatch.gen_patch,
+        jpatch.exec_patch,
+    ]
+    local_cfg = jconf.get_local()
+    paras = {"patch_dir" : "%s/%s"%(local_cfg['patch_dir'], sys.argv[2])}
+    return jcmd.exec_cmds(cmds, paras)
 
 def gen_deploy_file():
     pass
