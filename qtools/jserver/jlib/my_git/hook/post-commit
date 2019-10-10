@@ -13,23 +13,39 @@ def jpopen(cmd):
     lines = proc.stdout.readlines()
     print lines
 
-def main():
+def check_branch_name(paras):
     repo = git.Repo.init(path='.')
     branch_name = str(repo.head.ref)
-    if branch_name == "master":
-        return
-
     if branch_name.startswith("local") == False:
-        return
-    data = jpopen("git log -1 HEAD --format=%B")
-    patch_name = branch_name.split("-", 1)[1]
-    cmd = "python3 %s re_exec_patch %s"%(jserver_py, patch_name)
-    print cmd
-    os.system(cmd)
+        return -1
+    paras['branch_name'] = branch_name
+    return 0
 
-    cmd = "python3 %s gen_commit_msg %s"%(jserver_py, patch_name)
-    print cmd
+def generate_patch(paras):
+    patch_name = paras['branch_name'].split("-", 1)[1]
+    cmd = "python3 %s re_exec_patch %s"%(jserver_py, patch_name)
+    print (cmd)
     os.system(cmd)
+    paras['patch_name'] = patch_name
+    return 0
+
+def generate_commit_msg(paras):
+    cmd = "python3 %s gen_commit_msg %s"%(jserver_py, patch_name)
+    os.system(cmd)
+    return 0
+
+def main():
+    cmds = [
+        check_branch_name,
+        generate_patch,
+    ]
+    paras = {}
+    for cmd in cmds:
+        ret = cmd(paras)
+        print (ret, cmd)
+        if ret != 0:
+            break
+    print (paras)
 
 if __name__ == "__main__":
     main()
