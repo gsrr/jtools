@@ -1,0 +1,2 @@
+echo 'digraph { a -> b }' | dot -Tsvg > output.svg
+dot -Tsvg hal-input.dot > output.svg

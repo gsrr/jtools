@@ -1,0 +1,192 @@
+digraph L {
+graph [layout = dot,rankdir = LR]
+node [shape=circle fontname=Arial];
+bus_type [label="bus_type"]
+protocol [label="protocol"]
+pcie_sas_hba [label="pcie_sas_hba"]
+temp_thres_f [label="temp_thres_f"]
+slot_name [label="slot_name"]
+warning_temperature [label="warning_temperature"]
+smart_conf [label="smart_conf"]
+slot [label="slot"]
+hal [label="hal"]
+tr [label="tr"]
+capabilities [label="capabilities"]
+tl [label="tl"]
+smart_info [label="smart_info"]
+smart [label="smart"]
+count [label="count"]
+now_test_type [label="now_test_type"]
+enc_sensor_temp [label="enc_sensor_temp"]
+odd_owner [label="odd_owner"]
+support_list [label="support_list"]
+fan [label="fan"]
+slot_num [label="slot_num"]
+power_on_hours [label="power_on_hours"]
+internal_sas_hba [label="internal_sas_hba"]
+fan_region_name [label="fan_region_name"]
+summary [label="summary"]
+capability [label="capability"]
+mode [label="mode"]
+temp_threshold_switch [label="temp_threshold_switch"]
+temp_region_type [label="temp_region_type"]
+peripheral [label="peripheral"]
+serial_no [label="serial_no"]
+sed [label="sed"]
+wwn [label="wwn"]
+alias_name [label="alias_name"]
+enclosure [label="enclosure"]
+capacity [label="capacity"]
+upgrade_progress [label="upgrade_progress"]
+max_link_speed [label="max_link_speed"]
+used_percentage [label="used_percentage"]
+progress [label="progress"]
+sys_name [label="sys_name"]
+enc_name [label="enc_name"]
+power [label="power"]
+qm2 [label="qm2"]
+component [label="component"]
+schedule_switch [label="schedule_switch"]
+enc_info [label="enc_info"]
+cache_slot [label="cache_slot"]
+topology [label="topology"]
+redundant_status [label="redundant_status"]
+pd_num [label="pd_num"]
+friendly_name [label="friendly_name"]
+mac [label="mac"]
+pcie [label="pcie"]
+read_speed [label="read_speed"]
+fan_region_type [label="fan_region_type"]
+temp_thres [label="temp_thres"]
+temperature [label="temperature"]
+system [label="system"]
+pd [label="pd"]
+memory [label="memory"]
+eraser [label="eraser"]
+hdderr_led [label="hdderr_led"]
+test_schedule [label="test_schedule"]
+info [label="info"]
+mb [label="mb"]
+current_notify_event [label="current_notify_event"]
+mtp [label="mtp"]
+sas_jbod [label="sas_jbod"]
+property [label="property"]
+log_name [label="log_name"]
+last_test_type [label="last_test_type"]
+pd_port_num [label="pd_port_num"]
+disk_data_collection [label="disk_data_collection"]
+enc_type [label="enc_type"]
+setting [label="setting"]
+bsid_state [label="bsid_state"]
+status [label="status"]
+raid [label="raid"]
+fw [label="fw"]
+nic [label="nic"]
+link_speed [label="link_speed"]
+enc_id [label="enc_id"]
+sr [label="sr"]
+tpu [label="tpu"]
+model [label="model"]
+slot_form_factor [label="slot_form_factor"]
+hal->enclosure
+enclosure->pd
+pd->smart_conf
+smart_conf->temp_thres
+smart_conf->temp_thres_f
+smart_conf->test_schedule
+smart_conf->temp_threshold_switch
+smart_conf->schedule_switch
+smart_conf->last_test_type
+smart_conf->now_test_type
+pd->smart_info
+smart_info->summary
+smart_info->temperature
+pd->smart
+smart_info->current_notify_event
+smart_info->power_on_hours
+enclosure->info
+enclosure->enc_info
+enc_info->capability
+hal->system
+system->enc_id
+enc_id->status
+enclosure->enc_name
+enclosure->protocol
+enclosure->pd_num
+enclosure->pd_port_num
+enclosure->fan_region_name
+enclosure->fan_region_type
+enclosure->temp_region_type
+enclosure->status
+enclosure->friendly_name
+enclosure->serial_no
+enclosure->model
+enclosure->peripheral
+enclosure->fw
+fw->upgrade_progress
+enclosure->enc_id
+enclosure->cache_slot
+enclosure->tr
+enclosure->qm2
+enclosure->tl
+enclosure->fan
+fan->status
+enclosure->topology
+enclosure->log_name
+enclosure->enc_type
+enc_info->capabilities
+system->disk_data_collection
+enclosure->slot
+slot->status
+pd->status
+pd->serial_no
+pd->model
+pd->sys_name
+pd->slot_name
+pd->alias_name
+pd->bus_type
+pd->wwn
+pd->capacity
+pd->link_speed
+pd->max_link_speed
+pd->read_speed
+pd->used_percentage
+pd->slot_form_factor
+pd->log_name
+pd->enc_sensor_temp
+pd->sed
+sed->bsid_state
+sed->property
+sed->status
+pd->capabilities
+pd->sr
+sr->mode
+pd->redundant_status
+sr->fw
+tr->raid
+enclosure->hdderr_led
+enclosure->power
+power->status
+enclosure->temperature
+enclosure->setting
+setting->warning_temperature
+enclosure->pcie
+pcie->slot_num
+enclosure->mb
+mb->nic
+nic->mac
+mb->internal_sas_hba
+mb->pcie_sas_hba
+mb->memory
+pd->eraser
+eraser->progress
+pd->odd_owner
+enclosure->mtp
+enclosure->tpu
+enclosure->sas_jbod
+sas_jbod->topology
+sas_jbod->support_list
+sas_jbod->component
+component->count
+component->info
+}

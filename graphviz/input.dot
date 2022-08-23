@@ -1,0 +1,11 @@
+digraph L {
+
+  node [shape=circle fontname=Arial];
+
+  a  [label="enclosure"]
+  b  [label="one\ntwo three\nfour five six seven"]
+  c  [label="one\rtwo three\rfour five six seven\r"]
+
+  a -> b -> c
+
+}
